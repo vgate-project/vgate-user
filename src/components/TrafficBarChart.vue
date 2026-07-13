@@ -6,12 +6,13 @@ import type { HourlyStat } from '@/types/api'
 const props = defineProps<{ data: HourlyStat[] }>()
 
 // Bar height scales by the hour's total traffic relative to the busiest hour
-// (matches the admin dashboard chart).
+// (matches the admin dashboard chart). Capped at 80% so the value label above
+// each bar has headroom and never clips the header/legend.
 const maxTotal = computed(() =>
   Math.max(...props.data.map((p) => p.up + p.down), 1),
 )
 function barHeightPct(p: HourlyStat): number {
-  return ((p.up + p.down) / maxTotal.value) * 100
+  return ((p.up + p.down) / maxTotal.value) * 80
 }
 function segPct(part: number, p: HourlyStat): number {
   const t = p.up + p.down
@@ -41,6 +42,7 @@ function formatHour(iso: string): string {
         class="bar-col"
         :title="`${formatHour(p.hour)} · ↑${formatBytes(p.up)} ↓${formatBytes(p.down)}`"
       >
+        <span class="bar-value" :style="{ bottom: barHeightPct(p) + '%' }">{{ formatBytes(p.up + p.down) }}</span>
         <div class="bar" :style="{ height: barHeightPct(p) + '%' }">
           <div class="bar-seg up" :style="{ height: segPct(p.up, p) + '%' }"></div>
           <div class="bar-seg down" :style="{ height: segPct(p.down, p) + '%' }"></div>
@@ -99,9 +101,20 @@ function formatHour(iso: string): string {
 .bar-col {
   flex: 1;
   height: 100%;
+  position: relative;
   display: flex;
   align-items: flex-end;
   cursor: pointer;
+}
+.bar-value {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  font-size: 9px;
+  line-height: 1;
+  color: #909399;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .bar {
   width: 100%;

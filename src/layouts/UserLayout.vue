@@ -45,6 +45,7 @@ const menus = [
   { name: 'orders', label: 'Orders', icon: 'Tickets' },
   { name: 'traffic', label: 'Traffic', icon: 'DataLine' },
   { name: 'invites', label: 'Invites', icon: 'Promotion' },
+  { name: 'redeem', label: 'Redeem', icon: 'Discount' },
   { name: 'announcements', label: 'Announcements', icon: 'Notification' },
   { name: 'settings', label: 'Settings', icon: 'Setting' },
 ]

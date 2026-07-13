@@ -229,30 +229,31 @@ onMounted(async () => {
               </el-tag>
             </div>
           </template>
-          <el-empty v-if="nodes.length === 0" description="No nodes available" :image-size="60" />
-          <ul v-else class="node-list">
-            <li v-for="n in nodes" :key="n.id" class="node-item">
-              <span class="node-dot" :class="n.online ? 'on' : 'off'" />
-              <span class="node-name">{{ n.name }}</span>
-              <span class="node-addr">
-                {{ n.enabled ? `${n.address}:${n.port}` : 'Disabled' }}
-              </span>
-              <span class="node-mult" :title="`Traffic multiplier applied to this node: ${n.traffic_multiplier ?? 1}`">
-                ×{{ (n.traffic_multiplier ?? 1).toFixed(2) }}
-              </span>
-              <span class="node-state">
-                <el-tag size="small" :type="n.online ? 'success' : 'info'">
-                  {{ n.online ? 'Online' : 'Offline' }}
+          <el-table :data="nodes" size="small" style="width: 100%" max-height="220" empty-text="No nodes available">
+            <el-table-column label="Status" width="92">
+              <template #default="{ row }">
+                <span class="node-dot" :class="row.online ? 'on' : 'off'" />
+                <el-tag size="small" :type="row.online ? 'success' : 'info'">
+                  {{ row.online ? 'Online' : 'Offline' }}
                 </el-tag>
-              </span>
-            </li>
-          </ul>
+              </template>
+            </el-table-column>
+            <el-table-column prop="name" label="Name" />
+            <el-table-column label="Address">
+              <template #default="{ row }">
+                {{ row.enabled ? `${row.address}:${row.port}` : 'Disabled' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="Multiplier" width="110">
+              <template #default="{ row }">×{{ (row.traffic_multiplier ?? 1).toFixed(2) }}</template>
+            </el-table-column>
+          </el-table>
         </el-card>
       </el-col>
     </el-row>
 
     <el-card shadow="never" class="block">
-      <template #header>Traffic (24h)</template>
+      <template #header>Traffic</template>
       <TrafficBarChart :data="hourly" />
     </el-card>
   </div>
@@ -320,53 +321,17 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
 }
-.node-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  max-height: 320px;
-}
-.node-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid #ebeef5;
-  font-size: 14px;
-}
-.node-item:last-child {
-  border-bottom: none;
-}
 .node-dot {
+  display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  flex: none;
+  margin-right: 6px;
+  vertical-align: middle;
   background: #c0c4cc;
 }
 .node-dot.on {
   background: #67c23a;
-}
-.node-name {
-  font-weight: 600;
-  color: #303133;
-}
-.node-addr {
-  flex: 1;
-  color: #909399;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.node-mult {
-  flex: none;
-  font-variant-numeric: tabular-nums;
-  color: #606266;
-  background: #f4f4f5;
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 12px;
 }
 .head-actions {
   display: flex;

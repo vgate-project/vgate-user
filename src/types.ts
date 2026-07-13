@@ -70,6 +70,43 @@ export interface InviteRequest {
   note?: string
 }
 
+// --- Redemption codes ---
+export type RedeemType = 'traffic' | 'duration' | 'plan' | 'reset'
+
+export interface RedemptionCode {
+  id: string
+  code: string
+  type: RedeemType
+  max_uses: number
+  used_count: number
+  expires_at?: string | null
+  note?: string
+  quota_bytes?: number
+  duration_days?: number
+  plan_id?: string | null
+  created_by_admin_id?: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RedeemRequest {
+  code: string
+}
+
+export interface RedeemResponse {
+  record: RedemptionRecord
+  type: RedeemType
+  message: string
+}
+
+export interface RedemptionRecord {
+  id: string
+  code_id: string
+  user_id: string
+  type: RedeemType
+  redeemed_at: string
+}
+
 export interface UserProfile {
   id: string
   email: string
