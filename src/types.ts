@@ -14,7 +14,7 @@ export interface UserLoginResponse {
 }
 
 export interface UserLoginRequest {
-  username: string
+  email: string
   password: string
   cf_turnstile_response?: string
 }

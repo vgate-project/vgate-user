@@ -24,8 +24,8 @@ export const useAuthStore = defineStore('auth', {
     isAuthenticated: (s) => !!s.token,
   },
   actions: {
-    async login(username: string, password: string, cfTurnstileResponse?: string) {
-      const { data } = await apiAuth.login({ username, password, cf_turnstile_response: cfTurnstileResponse })
+    async login(email: string, password: string, cfTurnstileResponse?: string) {
+      const { data } = await apiAuth.login({ email, password, cf_turnstile_response: cfTurnstileResponse })
       this.setSession(data)
     },
     logout() {

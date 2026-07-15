@@ -4,7 +4,7 @@ import type { UserConfig, UserLoginResponse, UserLoginRequest, UserRegisterReque
 export const apiAuth = {
   // GET /user/config — public registration settings (no auth).
   getConfig: () => http.get<UserConfig>('/user/config'),
-  // POST /user/login — username/password → JWT.
+  // POST /user/login — email/password → JWT.
   login: (b: UserLoginRequest) => http.post<UserLoginResponse>('/user/login', b),
   // POST /user/register — create an account. Returns 201 (auto-login body) or
   // 202 (pending email verification). The caller must inspect resp.status.

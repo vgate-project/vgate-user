@@ -108,13 +108,13 @@ watch(
 )
 
 // ---- Login ----
-const username = ref('')
+const email = ref('')
 const password = ref('')
 const loading = ref(false)
 
 async function onLogin() {
-  if (!username.value || !password.value) {
-    ElMessage.warning('Please enter your username and password')
+  if (!email.value || !password.value) {
+    ElMessage.warning('Please enter your email and password')
     return
   }
   if (captchaEnabled.value && !captchaToken.value) {
@@ -123,7 +123,7 @@ async function onLogin() {
   }
   loading.value = true
   try {
-    await auth.login(username.value, password.value, captchaToken.value || undefined)
+    await auth.login(email.value, password.value, captchaToken.value || undefined)
     const redirect = (route.query.redirect as string) || '/'
     router.replace(redirect)
   } catch {
@@ -197,8 +197,8 @@ async function onRegister() {
       <!-- Login -->
       <template v-if="mode === 'login'">
         <el-form label-position="top" @submit.prevent="onLogin">
-          <el-form-item label="Username">
-            <el-input v-model="username" autofocus placeholder="Username" />
+          <el-form-item label="Email">
+            <el-input v-model="email" autofocus placeholder="Email" />
           </el-form-item>
           <el-form-item label="Password">
             <el-input
