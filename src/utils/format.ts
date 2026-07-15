@@ -1,6 +1,6 @@
 export function formatBytes(n: number): string {
   if (!n || n < 0) return '0 B'
-  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']
+  const units = ['B', 'K', 'M', 'G', 'T', 'P']
   let i = 0
   let v = n
   while (v >= 1024 && i < units.length - 1) {
