@@ -4,6 +4,9 @@ User-facing portal for **VGate**, built with Vue 3 + Vite + TypeScript. Customer
 it to log in, subscribe to a node, browse plans, place and pay orders, and monitor
 their traffic. It talks to the manager's REST API under `/api/v1`.
 
+When paying, the portal renders a **QR code** for WeChat Pay (NATIVE) and opens a redirect
+link for Alipay and Stripe Checkout, driven by the order's `pay_mode`.
+
 ## Tech stack
 
 - [Vue 3](https://vuejs.org/) (Composition API, `<script setup>`)
