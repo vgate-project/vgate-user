@@ -8,12 +8,29 @@ import { usePendingOrderStore } from '@/stores/pendingOrder'
 import { formatBytes, formatPrice } from '@/utils/format'
 import type { Plan, PlanPrice, TrafficPackage } from '@/types/api'
 import { OrderKindPlan, OrderKindTraffic } from '@/types/api'
+import PaymentDialog from '@/components/PaymentDialog.vue'
 
 const plans = ref<Plan[]>([])
 const packages = ref<TrafficPackage[]>([])
 const loading = ref(true)
 const buyingId = ref('')
 const pending = usePendingOrderStore()
+
+// Shared payment dialog: shows a QR code for wechat (pay_mode="qr") or a link
+// for alipay/stripe (pay_mode="redirect").
+const payVisible = ref(false)
+const payUrl = ref('')
+const payMode = ref<'redirect' | 'qr'>('redirect')
+
+function presentPayment(payUrlValue: string, payModeValue?: string) {
+  payUrl.value = payUrlValue
+  payMode.value = payModeValue === 'qr' ? 'qr' : 'redirect'
+  if (payMode.value === 'qr') {
+    payVisible.value = true
+  } else {
+    window.open(payUrlValue, '_blank')
+  }
+}
 
 // Selected price id per plan (keyed by plan id) so the user picks a billing
 // period before buying.
@@ -49,8 +66,8 @@ async function buyPlan(plan: Plan) {
       plan_price_id: price.id,
     })
     if (data.pay_url) {
-      window.open(data.pay_url, '_blank')
-      ElMessage.success('Order created. Please complete payment in the opened page.')
+      presentPayment(data.pay_url, data.pay_mode)
+      ElMessage.success('Order created. Please complete payment.')
       pending.refresh()
       pollUntilPaid(data.order.id)
     } else {
@@ -71,8 +88,8 @@ async function buyTraffic(pkg: TrafficPackage) {
       traffic_package_id: pkg.id,
     })
     if (data.pay_url) {
-      window.open(data.pay_url, '_blank')
-      ElMessage.success('Order created. Please complete payment in the opened page.')
+      presentPayment(data.pay_url, data.pay_mode)
+      ElMessage.success('Order created. Please complete payment.')
       pending.refresh()
       pollUntilPaid(data.order.id)
     } else {
@@ -194,6 +211,8 @@ onMounted(async () => {
         </el-row>
       </el-tab-pane>
     </el-tabs>
+
+    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" />
   </div>
 </template>
 

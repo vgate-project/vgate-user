@@ -97,11 +97,15 @@ export interface CreateOrderRequest {
   plan_price_id?: string // required when kind=plan
   traffic_package_id?: string // required when kind=traffic
   channel?: string // optional: "pc" | "wap" | "" (auto by UA)
+  platform?: string // payment gateway; defaults to alipay
 }
 
 export interface CreateOrderResponse {
   order: Order
   pay_url: string
+  // How to present pay_url to the user: "redirect" (open in browser) or
+  // "qr" (render pay_url as a QR code to scan, e.g. wechat NATIVE).
+  pay_mode?: 'redirect' | 'qr'
 }
 
 // UserNode mirrors dto.UserNodeView (manager/internal/api/dto/dto.go).

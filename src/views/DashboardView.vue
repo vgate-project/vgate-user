@@ -11,6 +11,7 @@ import TrafficBarChart from '@/components/TrafficBarChart.vue'
 import { formatBytes, formatDateTime } from '@/utils/format'
 import { OrderKindReset } from '@/types/api'
 import type { User, HourlyStat, Order, UserNode } from '@/types/api'
+import PaymentDialog from '@/components/PaymentDialog.vue'
 
 const router = useRouter()
 const pending = usePendingOrderStore()
@@ -93,6 +94,10 @@ function pollUntilResetPaid(orderId: string) {
   setTimeout(stopResetPoll, 120000)
 }
 
+const payVisible = ref(false)
+const payUrl = ref('')
+const payMode = ref<'redirect' | 'qr'>('redirect')
+
 async function onResetTraffic() {
   const pid = profile.value?.current_product_id
   if (!pid || !resetEnabled.value) return
@@ -100,7 +105,13 @@ async function onResetTraffic() {
   try {
     const { data } = await apiOrder.create({ kind: OrderKindReset, plan_id: pid })
     if (data.pay_url) {
-      window.open(data.pay_url, '_blank')
+      payUrl.value = data.pay_url
+      payMode.value = data.pay_mode === 'qr' ? 'qr' : 'redirect'
+      if (payMode.value === 'qr') {
+        payVisible.value = true
+      } else {
+        window.open(data.pay_url, '_blank')
+      }
       ElMessage.success('Order created — complete payment to reset traffic.')
       await pending.refresh()
       pollUntilResetPaid(data.order.id)
@@ -256,6 +267,8 @@ onMounted(async () => {
       <template #header>Traffic</template>
       <TrafficBarChart :data="hourly" />
     </el-card>
+
+    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" />
   </div>
 </template>
 

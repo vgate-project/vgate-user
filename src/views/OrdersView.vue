@@ -5,6 +5,7 @@ import { apiOrder } from '@/api/order'
 import { usePendingOrderStore } from '@/stores/pendingOrder'
 import { formatPrice, formatDateTime } from '@/utils/format'
 import type { Order } from '@/types/api'
+import PaymentDialog from '@/components/PaymentDialog.vue'
 
 const orders = ref<Order[]>([])
 const loading = ref(true)
@@ -75,13 +76,23 @@ function pollUntilPaid(orderId: string) {
 }
 
 const payingId = ref('')
+const payVisible = ref(false)
+const payUrl = ref('')
+const payMode = ref<'redirect' | 'qr'>('redirect')
+
 async function pay(order: Order) {
   payingId.value = order.id
   try {
     const { data } = await apiOrder.pay(order.id)
     if (data.pay_url) {
-      window.open(data.pay_url, '_blank')
-      ElMessage.success('Order created — complete payment in the opened tab.')
+      payUrl.value = data.pay_url
+      payMode.value = data.pay_mode === 'qr' ? 'qr' : 'redirect'
+      if (payMode.value === 'qr') {
+        payVisible.value = true
+      } else {
+        window.open(data.pay_url, '_blank')
+      }
+      ElMessage.success('Order created — complete payment.')
       pending.refresh()
       pollUntilPaid(order.id)
     } else {
@@ -189,5 +200,7 @@ onMounted(fetchOrders)
         />
       </div>
     </template>
+
+    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" />
   </div>
 </template>
