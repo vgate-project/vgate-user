@@ -22,6 +22,10 @@ export interface User {
   // reset package: lets the user self-purchase a reset from the dashboard.
   current_plan_reset_enabled?: boolean
   current_plan_reset_price?: number // cents
+  // Telegram link state (manager/internal/model/user.go). telegram_id is
+  // not exposed; only the derived link flag and the notification opt-in.
+  telegram_bound?: boolean
+  telegram_notify?: boolean
   created_at: string
   updated_at: string
 }

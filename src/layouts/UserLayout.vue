@@ -4,20 +4,48 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import { usePendingOrderStore } from '@/stores/pendingOrder'
+import { useTelegramStore } from '@/stores/telegram'
 import { apiAnnouncements } from '@/api/announcements'
 import PendingOrderAlert from '@/components/PendingOrderAlert.vue'
 import PendingOrderDot from '@/components/PendingOrderDot.vue'
+import TelegramBindAlert from '@/components/TelegramBindAlert.vue'
 import type { Announcement } from '@/types'
 
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const pending = usePendingOrderStore()
+const telegram = useTelegramStore()
 const collapsed = ref(false)
 
 // Active announcements pushed by admins; pinned items first (server order).
 const announcements = ref<Announcement[]>([])
-const dismissed = ref<Set<string>>(new Set())
+
+// Read state is persisted locally so a marked-as-read announcement stays
+// hidden across reloads (per browser). Keyed by announcement id.
+const READ_KEY = 'vgate_announcement_read'
+const readIds = ref<Set<string>>(loadReadIds())
+
+function loadReadIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(READ_KEY)
+    if (raw) return new Set(JSON.parse(raw) as string[])
+  } catch {
+    /* ignore malformed storage */
+  }
+  return new Set()
+}
+
+function markRead(id: string) {
+  const next = new Set(readIds.value)
+  next.add(id)
+  readIds.value = next
+  try {
+    localStorage.setItem(READ_KEY, JSON.stringify([...next]))
+  } catch {
+    /* ignore storage failures */
+  }
+}
 
 async function loadAnnouncements() {
   try {
@@ -29,14 +57,8 @@ async function loadAnnouncements() {
   }
 }
 
-function dismissAnnouncement(id: string) {
-  const next = new Set(dismissed.value)
-  next.add(id)
-  dismissed.value = next
-}
-
 const visibleAnnouncements = () =>
-  announcements.value.filter((a) => !dismissed.value.has(a.id))
+  announcements.value.filter((a) => !readIds.value.has(a.id))
 
 const menus = [
   { name: 'dashboard', label: 'Dashboard', icon: 'Odometer' },
@@ -57,6 +79,7 @@ function onLogout() {
 
 onMounted(() => {
   pending.refresh()
+  telegram.refresh()
   loadAnnouncements()
 })
 
@@ -64,6 +87,7 @@ onMounted(() => {
 // orders created/paid/closed on other pages without a full reload.
 router.afterEach(() => {
   pending.refresh()
+  telegram.refresh()
 })
 </script>
 
@@ -102,15 +126,22 @@ router.afterEach(() => {
         <template v-for="a in visibleAnnouncements()" :key="a.id">
           <el-alert
             :title="a.title"
-            :description="a.content || undefined"
             :type="a.pinned ? 'warning' : 'info'"
             :closable="true"
             show-icon
             class="announcement"
-            @close="dismissAnnouncement(a.id)"
-          />
+            @close="markRead(a.id)"
+          >
+            <div class="announcement-body">
+              <div class="announcement-content">{{ a.content }}</div>
+              <el-button size="small" type="primary" link @click="markRead(a.id)">
+                Mark as read
+              </el-button>
+            </div>
+          </el-alert>
         </template>
         <PendingOrderAlert />
+        <TelegramBindAlert />
         <router-view />
       </el-main>
     </el-container>
@@ -172,5 +203,16 @@ router.afterEach(() => {
 }
 .announcement {
   margin-bottom: 12px;
+}
+.announcement-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.announcement-content {
+  white-space: pre-wrap;
+}
+.announcement-body .el-button {
+  align-self: flex-end;
 }
 </style>

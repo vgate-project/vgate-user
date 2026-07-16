@@ -33,6 +33,7 @@ declare module 'vue' {
     ElPopconfirm: typeof import('element-plus/es')['ElPopconfirm']
     ElResult: typeof import('element-plus/es')['ElResult']
     ElRow: typeof import('element-plus/es')['ElRow']
+    ElSwitch: typeof import('element-plus/es')['ElSwitch']
     ElTable: typeof import('element-plus/es')['ElTable']
     ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
     ElTabPane: typeof import('element-plus/es')['ElTabPane']
@@ -43,6 +44,7 @@ declare module 'vue' {
     PendingOrderDot: typeof import('./components/PendingOrderDot.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TelegramBindAlert: typeof import('./components/TelegramBindAlert.vue')['default']
     TrafficBarChart: typeof import('./components/TrafficBarChart.vue')['default']
   }
   export interface ComponentCustomProperties {

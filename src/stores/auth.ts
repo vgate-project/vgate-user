@@ -63,6 +63,12 @@ export const useAuthStore = defineStore('auth', {
       this.userId = c.user_id ?? ''
       this.username = c.username ?? ''
     },
+    // setUsername updates the displayed name after a self-service rename, so
+    // the sidebar reflects the change without requiring a re-login. The JWT
+    // claims still carry the old name and are refreshed on next login.
+    setUsername(username: string) {
+      this.username = username
+    },
     persist() {
       const s: StoredSession = {
         token: this.token,
