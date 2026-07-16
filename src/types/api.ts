@@ -26,6 +26,10 @@ export interface User {
   // not exposed; only the derived link flag and the notification opt-in.
   telegram_bound?: boolean
   telegram_notify?: boolean
+  // Per-user speed cap (bytes/sec, 0 = unlimited). Effective cap is the
+  // minimum of this and the node's global limit; sourced from the active plan.
+  speed_limit_up_bps?: number
+  speed_limit_down_bps?: number
   created_at: string
   updated_at: string
 }
@@ -83,7 +87,8 @@ export interface Order {
   status: string // pending | paid | closed
   out_trade_no: string
   alipay_trade_no?: string
-  channel: string // pc | wap
+  platform?: string // payment gateway: alipay | manual | (future)
+  channel: string // alipay-only: pc | wap
   paid_at?: string | null
   expired_at?: string | null
   created_at: string

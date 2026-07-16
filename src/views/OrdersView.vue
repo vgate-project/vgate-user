@@ -38,11 +38,6 @@ const statusMeta: Record<string, { type: 'success' | 'warning' | 'info'; label: 
 function statusOf(s: string) {
   return statusMeta[s] ?? { type: 'info' as const, label: s }
 }
-function channelLabel(c: string) {
-  if (c === 'pc') return 'PC'
-  if (c === 'wap') return 'Mobile'
-  return c || '—'
-}
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 function stopPoll() {
@@ -153,8 +148,10 @@ onMounted(fetchOrders)
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Channel" width="100">
-          <template #default="{ row }">{{ channelLabel(row.channel) }}</template>
+        <el-table-column label="Platform" width="120" prop="platform">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain">{{ row.platform || 'alipay' }}<template v-if="row.channel"> · {{ row.channel }}</template></el-tag>
+          </template>
         </el-table-column>
         <el-table-column label="Created" min-width="170">
           <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>

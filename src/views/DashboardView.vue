@@ -54,6 +54,14 @@ const shareUrl = computed(() =>
   profile.value ? `${apiBase.value}/sub/${profile.value.sub_token}` : '',
 )
 const resetEnabled = computed(() => profile.value?.current_plan_reset_enabled ?? false)
+// 1 Mbps = 125000 bytes/sec; 0/absent means unlimited.
+const BPS_PER_MBPS = 125000
+const speedLimitText = computed(() => {
+  const up = profile.value?.speed_limit_up_bps ?? 0
+  const down = profile.value?.speed_limit_down_bps ?? 0
+  if (!up && !down) return 'Unlimited'
+  return `↑${up ? Math.round(up / BPS_PER_MBPS) : '∞'} / ↓${down ? Math.round(down / BPS_PER_MBPS) : '∞'} Mbps`
+})
 
 async function copySubscription() {
   if (!shareUrl.value) return
@@ -225,6 +233,7 @@ onMounted(async () => {
             </el-descriptions-item>
             <el-descriptions-item label="Plan">{{ activeProduct }}</el-descriptions-item>
             <el-descriptions-item label="Level">{{ profile?.level ?? '—' }}</el-descriptions-item>
+            <el-descriptions-item label="Speed limit">{{ speedLimitText }}</el-descriptions-item>
             <el-descriptions-item label="Expires">{{ expireText }}</el-descriptions-item>
             <el-descriptions-item label="Created">{{ formatDateTime(profile?.created_at) }}</el-descriptions-item>
           </el-descriptions>

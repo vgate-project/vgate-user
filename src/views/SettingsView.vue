@@ -234,9 +234,9 @@ onUnmounted(stopPolling)
 <template>
   <div>
     <h2 style="margin: 0 0 16px">Account Settings</h2>
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(560px, 100%), 1fr)); gap: 16px">
+    <div class="cards-grid">
       <el-card shadow="never" v-loading="loadingProfile">
-        <el-descriptions :column="1" border label-width="240px">
+        <el-descriptions :column="1" border label-width="120px">
           <el-descriptions-item label="Email">{{ profile?.email ?? '—' }}</el-descriptions-item>
           <el-descriptions-item label="Username">
             <span v-if="!editingUsername">
@@ -362,3 +362,22 @@ onUnmounted(stopPolling)
     </div>
   </div>
 </template>
+
+<style scoped>
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+/* Collapse to fewer columns on narrower viewports so cards stay readable. */
+@media (max-width: 1100px) {
+  .cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
