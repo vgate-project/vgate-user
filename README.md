@@ -7,6 +7,10 @@ their traffic. It talks to the manager's REST API under `/api/v1`.
 When paying, the portal renders a **QR code** for WeChat Pay (NATIVE) and opens a redirect
 link for Alipay and Stripe Checkout, driven by the order's `pay_mode`.
 
+The dashboard shows the user's effective speed cap (sourced from the active plan or a
+manual override), and the orders page displays the payment platform (Alipay / manual)
+for each order.
+
 ## Tech stack
 
 - [Vue 3](https://vuejs.org/) (Composition API, `<script setup>`)

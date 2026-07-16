@@ -231,7 +231,12 @@ onMounted(async () => {
                 {{ profile?.enabled ? 'Enabled' : 'Disabled' }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="Plan">{{ activeProduct }}</el-descriptions-item>
+            <el-descriptions-item label="Plan">
+              {{ profile?.current_product_name || '-' }}
+              <el-tag v-if="profile?.current_product_kind" type="primary" size="small">
+                {{ profile?.current_product_kind }}
+              </el-tag>
+            </el-descriptions-item>
             <el-descriptions-item label="Level">{{ profile?.level ?? '—' }}</el-descriptions-item>
             <el-descriptions-item label="Speed limit">{{ speedLimitText }}</el-descriptions-item>
             <el-descriptions-item label="Expires">{{ expireText }}</el-descriptions-item>
