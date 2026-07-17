@@ -82,8 +82,14 @@ User sessions use JWT access tokens that are **not refreshable**. The axios resp
 interceptor in `src/api/http.ts` treats a `401` as "session expired": it clears the
 stored token and redirects the user to `/login` (there is no silent auto-refresh,
 unlike the admin console). The login form also supports a Cloudflare Turnstile field
-(`cf_turnstile_response`) when the manager requires it, and there is a `/verify-email`
-flow for email verification.
+(`cf_turnstile_response`) when the manager requires it.
+
+Registration auto-logs-in: `POST /user/register` returns a session on both `201`
+(active) and `202` (pending email verification), so a new user lands straight on the
+dashboard's verify banner. **Email verification gates purchases and proxy traffic, not
+login** — an unverified user can browse but cannot place orders or consume traffic until
+`email_verified` is true. The `/verify-email` page (also reachable while already logged
+in) completes verification and clears the banner.
 
 ## Routes / pages
 
@@ -100,8 +106,9 @@ flow for email verification.
   - `/settings` — account settings / change password, and link a Telegram account
 
 Unauthenticated users hitting a protected route are redirected to `/login`
-(`?redirect=…`); already-authenticated users visiting a public route are sent to the
-dashboard.
+(`?redirect=…`). The one public-route exception is `/verify-email`, which stays reachable
+while authenticated so a logged-in, unverified user can complete verification; every other
+public route sends an authenticated visitor to the dashboard.
 
 ## Telegram & support tickets
 
