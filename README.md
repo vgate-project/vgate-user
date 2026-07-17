@@ -96,11 +96,21 @@ flow for email verification.
   - `/traffic` — traffic usage
   - `/invites` — invite codes / referral
   - `/announcements` — system announcements
-  - `/settings` — account settings / change password
+  - `/tickets` — support tickets (open, reply, close; choose Telegram/email notifications)
+  - `/settings` — account settings / change password, and link a Telegram account
 
 Unauthenticated users hitting a protected route are redirected to `/login`
 (`?redirect=…`); already-authenticated users visiting a public route are sent to the
 dashboard.
+
+## Telegram & support tickets
+
+- **Telegram binding** — link a personal Telegram account from **Settings** through a `/start`
+  deep link. Once linked, you can receive ticket alerts there.
+- **Support tickets** — open tickets from the **Tickets** page, reply in the thread, and
+  **close your own ticket** once it is resolved. When creating a ticket you choose how you are
+  notified of admin replies: **Telegram** (the default when your account is linked), **Email**,
+  or **None**.
 
 ## Deployment
 
