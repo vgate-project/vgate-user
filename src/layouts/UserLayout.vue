@@ -69,6 +69,7 @@ const menus = [
   { name: 'invites', label: 'Invites', icon: 'Promotion' },
   { name: 'redeem', label: 'Redeem', icon: 'Discount' },
   { name: 'announcements', label: 'Announcements', icon: 'Notification' },
+  { name: 'tickets', label: 'Tickets', icon: 'ChatLineRound' },
   { name: 'settings', label: 'Settings', icon: 'Setting' },
 ]
 
