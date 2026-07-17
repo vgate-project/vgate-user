@@ -254,7 +254,7 @@ onMounted(async () => {
               </el-tag>
             </div>
           </template>
-          <el-table :data="nodes" size="small" style="width: 100%" max-height="220" empty-text="No nodes available">
+          <el-table :data="nodes" size="small" style="width: 100%" max-height="200" empty-text="No nodes available">
             <el-table-column label="Status" width="92">
               <template #default="{ row }">
                 <span class="node-dot" :class="row.online ? 'on' : 'off'" />
@@ -278,7 +278,6 @@ onMounted(async () => {
     </el-row>
 
     <el-card shadow="never" class="block">
-      <template #header>Traffic</template>
       <TrafficBarChart :data="hourly" />
     </el-card>
 

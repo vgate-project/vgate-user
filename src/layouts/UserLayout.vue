@@ -95,7 +95,10 @@ router.afterEach(() => {
 <template>
   <el-container class="layout">
     <el-aside :width="collapsed ? '64px' : '220px'" class="aside">
-      <div class="brand" @click="router.push('/')">{{ collapsed ? 'V' : 'VGate' }}</div>
+      <div class="brand" @click="router.push('/')">
+        <img class="brand-logo" src="/favicon.svg" alt="VGate" />
+        <span v-if="!collapsed">VGate</span>
+      </div>
       <el-menu
         mode="vertical"
         :collapse="collapsed"
@@ -162,6 +165,9 @@ router.afterEach(() => {
   overflow-x: hidden;
 }
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-weight: 700;
   font-size: 1.25rem;
   color: #409eff;
@@ -170,6 +176,12 @@ router.afterEach(() => {
   letter-spacing: 0.5px;
   white-space: nowrap;
   overflow: hidden;
+}
+.brand-logo {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 6px;
 }
 .nav {
   flex: 1;
