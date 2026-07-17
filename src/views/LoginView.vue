@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import { useAuthStore } from '@/stores/auth'
+import { useAppStore } from '@/stores/app'
 import { apiAuth } from '@/api/auth'
 import type { UserConfig, UserLoginResponse } from '@/types'
 
 const auth = useAuthStore()
+const app = useAppStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -26,6 +28,8 @@ async function loadConfig() {
   try {
     const { data } = await apiAuth.getConfig()
     config.value = data
+    app.siteName = data.site_name || 'VGate'
+    document.title = app.siteName
   } catch {
     // Config is non-critical; default to hiding the register option.
     config.value = null
@@ -192,7 +196,7 @@ async function onRegister() {
 <template>
   <div class="login-wrap">
     <el-card class="login-card" shadow="always">
-      <h2 class="title">VGate</h2>
+      <h2 class="title">{{ app.siteName }}</h2>
 
       <!-- Login -->
       <template v-if="mode === 'login'">

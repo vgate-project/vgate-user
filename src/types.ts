@@ -5,6 +5,7 @@ export interface UserConfig {
   register_require_email_verify: boolean
   captcha_enabled: boolean
   captcha_site_key: string
+  site_name: string
 }
 
 export interface UserLoginResponse {

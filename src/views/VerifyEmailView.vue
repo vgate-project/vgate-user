@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import { apiAuth } from '@/api/auth'
+import { useAppStore } from '@/stores/app'
 import type { UserConfig } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
+const app = useAppStore()
 
 type Status = 'idle' | 'verifying' | 'success' | 'error'
 const status = ref<Status>('idle')
@@ -89,6 +91,7 @@ onMounted(async () => {
     const { data } = await apiAuth.getConfig()
     config.value = data
     captchaEnabled.value = !!data.captcha_enabled
+    app.siteName = data.site_name || 'VGate'
   } catch {
     captchaEnabled.value = false
   }

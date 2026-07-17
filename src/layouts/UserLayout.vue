@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import { useAppStore } from '@/stores/app'
 import { usePendingOrderStore } from '@/stores/pendingOrder'
 import { useTelegramStore } from '@/stores/telegram'
 import { apiAnnouncements } from '@/api/announcements'
@@ -12,6 +13,7 @@ import TelegramBindAlert from '@/components/TelegramBindAlert.vue'
 import type { Announcement } from '@/types'
 
 const auth = useAuthStore()
+const app = useAppStore()
 const route = useRoute()
 const router = useRouter()
 const pending = usePendingOrderStore()
@@ -82,6 +84,7 @@ onMounted(() => {
   pending.refresh()
   telegram.refresh()
   loadAnnouncements()
+  app.loadSiteName()
 })
 
 // Re-evaluate pending orders on every navigation so the alert/dot reflect
@@ -96,8 +99,8 @@ router.afterEach(() => {
   <el-container class="layout">
     <el-aside :width="collapsed ? '64px' : '220px'" class="aside">
       <div class="brand" @click="router.push('/')">
-        <img class="brand-logo" src="/favicon.svg" alt="VGate" />
-        <span v-if="!collapsed">VGate</span>
+        <img class="brand-logo" src="/favicon.svg" alt="Logo" />
+        <span v-if="!collapsed">{{ app.siteName }}</span>
       </div>
       <el-menu
         mode="vertical"
