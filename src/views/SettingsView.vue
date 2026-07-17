@@ -237,7 +237,15 @@ onUnmounted(stopPolling)
     <div class="cards-grid">
       <el-card shadow="never" v-loading="loadingProfile">
         <el-descriptions :column="1" border label-width="120px">
-          <el-descriptions-item label="Email">{{ profile?.email ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="Email">
+            {{ profile?.email ?? '—' }}
+            <el-tag
+              v-if="profile?.email"
+              :type="profile?.email_verified ? 'success' : 'warning'"
+              size="small"
+              style="margin-left: 8px"
+            >{{ profile?.email_verified ? 'Verified' : 'Unverified' }}</el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="Username">
             <span v-if="!editingUsername">
               {{ profile?.username ?? '—' }}
@@ -254,7 +262,7 @@ onUnmounted(stopPolling)
           <el-descriptions-item label="Level">{{ profile?.level ?? '—' }}</el-descriptions-item>
           <el-descriptions-item label="Expires At">{{ formatDateTime(profile?.expire_at) }}</el-descriptions-item>
           <el-descriptions-item label="Quota">
-            {{ profile ? (profile.quota_bytes === 0 ? 'Unlimited' : formatBytes(profile.quota_bytes)) : '—' }}
+            {{ profile ? (profile.quota_bytes === -1 ? 'Unlimited' : profile.quota_bytes === 0 ? 'No quota' : formatBytes(profile.quota_bytes)) : '—' }}
           </el-descriptions-item>
           <el-descriptions-item label="Status">
             <el-tag :type="profile?.enabled ? 'success' : 'danger'" size="small">

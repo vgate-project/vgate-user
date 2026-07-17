@@ -1,15 +1,25 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import { apiAuth } from '@/api/auth'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import type { UserConfig } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const app = useAppStore()
+const auth = useAuthStore()
+
+// After verifying, an already-authenticated user (the A1 auto-login case)
+// should return to the dashboard, where the profile re-fetch clears the
+// verify banner; an unauthenticated user goes to login.
+const nextLabel = computed(() => (auth.isAuthenticated ? 'Go to dashboard' : 'Go to login'))
+function goNext() {
+  router.push(auth.isAuthenticated ? '/' : '/login')
+}
 
 type Status = 'idle' | 'verifying' | 'success' | 'error'
 const status = ref<Status>('idle')
@@ -120,7 +130,7 @@ onMounted(async () => {
         :sub-title="message"
       >
         <template #extra>
-          <el-button type="primary" @click="router.push('/login')">Go to login</el-button>
+          <el-button type="primary" @click="goNext">{{ nextLabel }}</el-button>
         </template>
       </el-result>
 
@@ -131,7 +141,7 @@ onMounted(async () => {
         :sub-title="message"
       >
         <template #extra>
-          <el-button type="primary" @click="router.push('/login')">Go to login</el-button>
+          <el-button type="primary" @click="goNext">{{ nextLabel }}</el-button>
         </template>
       </el-result>
 

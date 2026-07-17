@@ -53,7 +53,8 @@ const regCaptchaEl = ref<HTMLElement | null>(null)
 let activeWidgetId: number | null = null
 
 function activeCaptchaEl(): HTMLElement | null {
-  return mode.value === 'login' ? loginCaptchaEl.value : regCaptchaEl.value
+  if (mode.value === 'login') return loginCaptchaEl.value
+  return regCaptchaEl.value
 }
 
 function resetCaptcha() {
@@ -173,17 +174,15 @@ async function onRegister() {
       invite_code: reg.value.inviteCode || undefined,
       cf_turnstile_response: captchaToken.value || undefined,
     })
-    if (resp.status === 201) {
-      // Auto-login: the body is a UserLoginResponse.
-      auth.setSession(resp.data as UserLoginResponse)
+    if (resp.status === 201 || resp.status === 202) {
+      // Both verified (201) and verification-pending (202) return a session,
+      // so auto-log-in either way. A pending user lands on the dashboard,
+      // where the verify banner guides them to confirm their email.
+      auth.setSession(resp.data)
       const redirect = (route.query.redirect as string) || '/'
       router.replace(redirect)
       return
     }
-    // 202 → pending email verification; no session, prompt the user.
-    const msg = (resp.data as { message?: string }).message
-    ElMessage.success(msg || 'Registration received. Check your email to verify your account.')
-    go('login')
   } catch {
     // Error surfaced by the http interceptor. Force a fresh challenge.
     resetCaptcha()
@@ -191,7 +190,10 @@ async function onRegister() {
     registering.value = false
   }
 }
+
 </script>
+
+
 
 <template>
   <div class="login-wrap">

@@ -108,7 +108,12 @@ router.beforeEach((to) => {
   if (to.meta.requiresAuth && !isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
-  if (to.meta.public && isAuthenticated) {
+  // Only the login page is skipped for already-authenticated users. Other
+  // public routes (e.g. /verify-email) must still render — with A1 auto-login
+  // a pending user is already authenticated when they click the emailed
+  // verification link, and bouncing them to the dashboard would prevent the
+  // verification from ever running.
+  if (to.name === 'login' && isAuthenticated) {
     return { name: 'dashboard' }
   }
   return true

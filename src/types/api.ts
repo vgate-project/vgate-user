@@ -10,13 +10,14 @@ export interface User {
   sub_token: string // share-URL credential
   level: number
   expire_at?: string | null
-  quota_bytes: number // 0 = unlimited
+  quota_bytes: number // -1 = unlimited, 0 = no quota, >0 = capped (bytes)
   quota_reset_enabled: boolean // participates in global monthly reset (day from system config)
   up_total: number
   down_total: number
   last_traffic_at?: string | null
   last_reset_at?: string | null
   enabled: boolean
+  email_verified?: boolean // whether the user proved ownership of Email
   has_password?: boolean // derived: whether the user has a password set
   // Surfaced by the backend when the active product is a plan with a traffic
   // reset package: lets the user self-purchase a reset from the dashboard.

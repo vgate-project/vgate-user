@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { apiUser } from '@/api/user'
+import { apiAuth } from '@/api/auth'
 import { apiTraffic } from '@/api/traffic'
 import { apiOrder } from '@/api/order'
 import { apiNode } from '@/api/node'
@@ -22,13 +23,34 @@ const orders = ref<Order[]>([])
 const nodes = ref<UserNode[]>([])
 const loading = ref(true)
 
+// Email verification banner: an unverified account can log in and manage its
+// profile, but cannot purchase or consume traffic until it verifies its email.
+const emailUnverified = computed(() => !!profile.value && !profile.value.email_verified)
+const resending = ref(false)
+async function resendVerification() {
+  if (!profile.value?.email) return
+  resending.value = true
+  try {
+    await apiAuth.resendVerification(profile.value.email)
+    ElMessage.success('Verification email sent — please check your inbox.')
+  } catch {
+    /* error toasted by interceptor */
+  } finally {
+    resending.value = false
+  }
+}
+
 const usedTotal = computed(() =>
   profile.value ? profile.value.up_total + profile.value.down_total : 0,
 )
 const quota = computed(() => profile.value?.quota_bytes ?? 0)
-const remaining = computed(() => (quota.value === 0 ? -1 : Math.max(quota.value - usedTotal.value, 0)))
+const quotaUnlimited = computed(() => quota.value === -1)
+const remaining = computed(() =>
+  quotaUnlimited.value ? -1 : Math.max(quota.value - usedTotal.value, 0),
+)
 const usedPct = computed(() => {
-  if (quota.value === 0) return 0
+  if (quotaUnlimited.value) return 0
+  if (quota.value === 0) return 100
   return Math.min(Math.round((usedTotal.value / quota.value) * 100), 100)
 })
 const pendingOrders = computed(() => orders.value.filter((o) => o.status === 'pending'))
@@ -161,6 +183,22 @@ onMounted(async () => {
   <div v-loading="loading">
     <h2 style="margin: 0 0 16px">Dashboard</h2>
 
+    <el-alert
+      v-if="emailUnverified"
+      type="warning"
+      show-icon
+      :closable="false"
+      class="verify-banner"
+      title="Your email is not verified"
+    >
+      <template #default>
+        <span>Purchases and traffic are disabled until you verify. </span>
+        <el-button type="primary" link size="small" :loading="resending" @click="resendVerification">
+          Resend verification email
+        </el-button>
+      </template>
+    </el-alert>
+
     <el-row :gutter="16" class="stat-row">
       <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="never" class="stat">
@@ -182,8 +220,8 @@ onMounted(async () => {
       <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="never" class="stat">
           <div class="stat-label">Remaining</div>
-          <div class="stat-value">{{ quota === 0 ? '∞' : formatBytes(remaining) }}</div>
-          <div class="stat-sub">{{ quota === 0 ? 'Unlimited plan' : usedPct + '% used' }}</div>
+          <div class="stat-value">{{ quotaUnlimited ? '∞' : formatBytes(remaining) }}</div>
+          <div class="stat-sub">{{ quotaUnlimited ? 'Unlimited plan' : quota === 0 ? 'No quota' : usedPct + '% used' }}</div>
           <div v-if="resetEnabled" class="stat-action">
             <el-popconfirm
                 title="Reset traffic now? This creates a paid order."
@@ -225,7 +263,15 @@ onMounted(async () => {
           <el-descriptions :column="2" border>
             <el-descriptions-item label="User ID">{{ profile?.id || '—' }}</el-descriptions-item>
             <el-descriptions-item label="Username">{{ profile?.username || '—' }}</el-descriptions-item>
-            <el-descriptions-item label="Email">{{ profile?.email || '—' }}</el-descriptions-item>
+            <el-descriptions-item label="Email">
+              {{ profile?.email || '—' }}
+              <el-tag
+                v-if="profile?.email"
+                :type="profile?.email_verified ? 'success' : 'warning'"
+                size="small"
+                style="margin-left: 8px"
+              >{{ profile?.email_verified ? 'Verified' : 'Unverified' }}</el-tag>
+            </el-descriptions-item>
             <el-descriptions-item label="Status">
               <el-tag :type="profile?.enabled ? 'success' : 'danger'" size="small">
                 {{ profile?.enabled ? 'Enabled' : 'Disabled' }}
