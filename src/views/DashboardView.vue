@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { apiUser } from '@/api/user'
@@ -12,6 +12,7 @@ import TrafficBarChart from '@/components/TrafficBarChart.vue'
 import { formatBytes, formatDateTime } from '@/utils/format'
 import { OrderKindReset } from '@/types/api'
 import type { User, HourlyStat, Order, UserNode } from '@/types/api'
+import type { UserConfig } from '@/types'
 import PaymentDialog from '@/components/PaymentDialog.vue'
 
 const router = useRouter()
@@ -26,19 +27,90 @@ const loading = ref(true)
 // Email verification banner: an unverified account can log in and manage its
 // profile, but cannot purchase or consume traffic until it verifies its email.
 const emailUnverified = computed(() => !!profile.value && !profile.value.email_verified)
+
+// Turnstile captcha for the resend action. The backend gates
+// POST /user/resend-verification behind the same captcha as register/verify
+// (see user_auth.go ResendVerification), so when it is enabled we must render
+// a widget and forward the token. This mirrors VerifyEmailView.
+const config = ref<UserConfig | null>(null)
+const captchaEnabled = ref(false)
+const captchaToken = ref('')
+const captchaEl = ref<HTMLElement | null>(null)
+let activeWidgetId: number | null = null
+let turnstileLoading = false
+
+function ensureTurnstile(cb: () => void) {
+  if ((window as any).turnstile) {
+    cb()
+    return
+  }
+  if (turnstileLoading) return
+  turnstileLoading = true
+  const s = document.createElement('script')
+  s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+  s.async = true
+  s.defer = true
+  s.onload = () => cb()
+  document.head.appendChild(s)
+}
+
+function renderCaptcha() {
+  const el = captchaEl.value
+  const sitekey = config.value?.captcha_site_key
+  if (!el || !(window as any).turnstile || !sitekey) return
+  activeWidgetId = (window as any).turnstile.render(el, {
+    sitekey,
+    callback: (t: string) => {
+      captchaToken.value = t
+    },
+    'expired-callback': () => {
+      captchaToken.value = ''
+    },
+    'error-callback': () => {
+      captchaToken.value = ''
+    },
+  })
+}
+
+function resetResendCaptcha() {
+  if (activeWidgetId !== null && (window as any).turnstile) {
+    ;(window as any).turnstile.reset(activeWidgetId)
+  }
+  captchaToken.value = ''
+}
+
 const resending = ref(false)
 async function resendVerification() {
   if (!profile.value?.email) return
+  if (captchaEnabled.value && !captchaToken.value) {
+    ElMessage.warning('Please complete the captcha')
+    return
+  }
   resending.value = true
   try {
-    await apiAuth.resendVerification(profile.value.email)
+    await apiAuth.resendVerification(
+      profile.value.email,
+      captchaEnabled.value ? captchaToken.value : undefined,
+    )
     ElMessage.success('Verification email sent — please check your inbox.')
+    resetResendCaptcha()
   } catch {
     /* error toasted by interceptor */
+    resetResendCaptcha()
   } finally {
     resending.value = false
   }
 }
+
+// Render the captcha widget once the verify banner is visible and captcha is on.
+watch(
+  () => emailUnverified.value && captchaEnabled.value,
+  async (show) => {
+    if (!show) return
+    await nextTick()
+    ensureTurnstile(renderCaptcha)
+  },
+)
 
 const usedTotal = computed(() =>
   profile.value ? profile.value.up_total + profile.value.down_total : 0,
@@ -169,6 +241,15 @@ async function loadAll() {
 }
 
 onMounted(async () => {
+  // Load public captcha config so the resend button can gate behind Turnstile
+  // when the backend has captcha enabled.
+  try {
+    const { data } = await apiAuth.getConfig()
+    config.value = data
+    captchaEnabled.value = !!data.captcha_enabled
+  } catch {
+    captchaEnabled.value = false
+  }
   try {
     await loadAll()
   } catch {
@@ -193,7 +274,15 @@ onMounted(async () => {
     >
       <template #default>
         <span>Purchases and traffic are disabled until you verify. </span>
-        <el-button type="primary" link size="small" :loading="resending" @click="resendVerification">
+        <div v-if="captchaEnabled" ref="captchaEl" class="captcha-box"></div>
+        <el-button
+          type="primary"
+          link
+          size="small"
+          :loading="resending"
+          :disabled="captchaEnabled && !captchaToken"
+          @click="resendVerification"
+        >
           Resend verification email
         </el-button>
       </template>
@@ -381,6 +470,9 @@ onMounted(async () => {
 }
 .block {
   margin-bottom: 16px;
+}
+.verify-banner :deep(.captcha-box) {
+  margin: 8px 0;
 }
 .info-card {
   flex: 1;
