@@ -24,6 +24,9 @@ function goNext() {
 type Status = 'idle' | 'verifying' | 'success' | 'error'
 const status = ref<Status>('idle')
 const message = ref('')
+// Guard against double-submit: block re-entry while a request is in flight or
+// already finished, so the user cannot click through to a false "failed".
+const submitting = ref(false)
 
 const token = (route.query.token as string) || ''
 
@@ -70,6 +73,12 @@ function renderCaptcha() {
 }
 
 async function doVerify() {
+  // Fool-proofing: never run twice (e.g. auto-POST on mount racing a manual
+  // click, or the user mashing the button). The backend is idempotent for
+  // already-verified accounts, but skipping the duplicate keeps the UI clean.
+  if (submitting.value || status.value === 'success' || status.value === 'error') {
+    return
+  }
   if (!token) {
     status.value = 'error'
     message.value = 'Missing verification token in the link.'
@@ -79,20 +88,33 @@ async function doVerify() {
     ElMessage.warning('Please complete the captcha')
     return
   }
+  submitting.value = true
   status.value = 'verifying'
   try {
     await apiAuth.verifyEmail(token, captchaEnabled.value ? captchaToken.value : undefined)
     status.value = 'success'
     message.value = 'Email verified. Your account is now active — you can log in.'
     ElMessage.success('Email verified')
-  } catch {
-    // Error (e.g. expired/invalid token) surfaced by the http interceptor.
-    status.value = 'error'
-    message.value = 'Verification failed. The link may be invalid or expired.'
-    if (activeWidgetId !== null && (window as any).turnstile) {
-      ;(window as any).turnstile.reset(activeWidgetId)
-      captchaToken.value = ''
+  } catch (e: any) {
+    const msg = e?.response?.data?.error || ''
+    // If the account is already verified, show success instead of "failed":
+    // a repeated/auto-fired request after a successful verify is expected,
+    // not an error. Backend returns 400 for genuinely bad/expired tokens.
+    if (msg.includes('already verified') || msg.includes('already active')) {
+      status.value = 'success'
+      message.value = 'Email verified. Your account is now active — you can log in.'
+      ElMessage.success('Email verified')
+    } else {
+      // Error (e.g. expired/invalid token) surfaced by the http interceptor.
+      status.value = 'error'
+      message.value = 'Verification failed. The link may be invalid or expired.'
+      if (activeWidgetId !== null && (window as any).turnstile) {
+        ;(window as any).turnstile.reset(activeWidgetId)
+        captchaToken.value = ''
+      }
     }
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -153,7 +175,7 @@ onMounted(async () => {
       <div v-else class="gate">
         <p>Please complete the captcha to verify your email address.</p>
         <div ref="captchaEl" class="captcha-box"></div>
-        <el-button type="primary" :disabled="!token" @click="doVerify">Verify email</el-button>
+        <el-button type="primary" :disabled="!token || submitting" @click="doVerify">Verify email</el-button>
       </div>
     </el-card>
   </div>
