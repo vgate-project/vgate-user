@@ -22,6 +22,10 @@ const loadingConfig = ref(false)
 const registerEnabled = computed(() => config.value?.register_enabled ?? false)
 const requireInvite = computed(() => config.value?.register_require_invite ?? false)
 const captchaEnabled = computed(() => config.value?.captcha_enabled ?? false)
+// Allowed email domains for registration (from the manager's whitelist). When
+// non-empty the register email field is rendered as a local-part input plus a
+// domain dropdown; when empty the user types a free email address.
+const emailWhitelist = computed(() => config.value?.register_email_suffix_whitelist ?? [])
 
 async function loadConfig() {
   loadingConfig.value = true
@@ -140,10 +144,23 @@ async function onLogin() {
 }
 
 // ---- Register ----
-const reg = ref({ username: '', email: '', password: '', confirm: '', inviteCode: '' })
+const reg = ref({ username: '', email: '', emailLocal: '', emailDomain: '', password: '', confirm: '', inviteCode: '' })
 const registering = ref(false)
 
+// Default the domain dropdown to the first allowed domain once the whitelist
+// loads, so the user always has a valid selection.
+watch(emailWhitelist, (list) => {
+  if (list.length && !reg.value.emailDomain) {
+    reg.value.emailDomain = list[0]
+  }
+})
+
 async function onRegister() {
+  // When a domain whitelist is active, compose the full email from the
+  // local-part input and the selected domain before validating/submitting.
+  if (emailWhitelist.value.length) {
+    reg.value.email = reg.value.emailLocal.trim() + '@' + reg.value.emailDomain
+  }
   if (!reg.value.username || !reg.value.email || !reg.value.password) {
     ElMessage.warning('Please fill in username, email and password')
     return
@@ -232,7 +249,16 @@ async function onRegister() {
           <el-form-item label="Username">
             <el-input v-model="reg.username" autofocus placeholder="Choose a username" />
           </el-form-item>
-          <el-form-item label="Email">
+          <el-form-item v-if="emailWhitelist.length" label="Email">
+            <el-input v-model="reg.emailLocal" placeholder="username">
+              <template #append>
+                <el-select v-model="reg.emailDomain" placeholder="@domain" style="width: 170px">
+                  <el-option v-for="d in emailWhitelist" :key="d" :label="'@' + d" :value="d" />
+                </el-select>
+              </template>
+            </el-input>
+          </el-form-item>
+          <el-form-item v-else label="Email">
             <el-input v-model="reg.email" type="email" placeholder="you@example.com" />
           </el-form-item>
           <el-form-item label="Password">

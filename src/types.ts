@@ -3,6 +3,7 @@ export interface UserConfig {
   register_enabled: boolean
   register_require_invite: boolean
   register_require_email_verify: boolean
+  register_email_suffix_whitelist: string[]
   captcha_enabled: boolean
   captcha_site_key: string
   site_name: string

@@ -137,6 +137,17 @@ const expireText = computed(() => {
   if (!e || e === '0001-01-01T00:00:00Z') return '—'
   return formatDateTime(e)
 })
+// Show the Renew button when the plan is expired or within 7 days of expiry.
+const RENEW_THRESHOLD_DAYS = 7
+const showRenew = computed(() => {
+  const e = profile.value?.expire_at
+  if (!e || e === '0001-01-01T00:00:00Z') return false
+  const msLeft = new Date(e).getTime() - Date.now()
+  return msLeft <= RENEW_THRESHOLD_DAYS * 24 * 60 * 60 * 1000
+})
+function onRenew() {
+  router.push('/plans')
+}
 
 // Absolute base for the share URL / subscription link (mirrors SubscriptionView).
 const apiBase = computed(() => {
@@ -298,7 +309,10 @@ onMounted(async () => {
               {{ profile.current_product_kind }}
             </el-tag>
           </div>
-          <div class="stat-sub">Expires: {{ expireText }}</div>
+          <div class="stat-sub">
+            Expires: {{ expireText }}
+            <el-button v-if="showRenew" link type="primary" size="small" @click="onRenew">Renew</el-button>
+          </div>
           <div class="stat-action">
             <el-button type="primary" size="small" :disabled="!profile?.sub_token" @click="copySubscription">
               Copy subscription
