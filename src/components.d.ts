@@ -43,12 +43,14 @@ declare module 'vue' {
     ElTabPane: typeof import('element-plus/es')['ElTabPane']
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElTag: typeof import('element-plus/es')['ElTag']
+    ElTooltip: typeof import('element-plus/es')['ElTooltip']
     PaymentDialog: typeof import('./components/PaymentDialog.vue')['default']
     PendingOrderAlert: typeof import('./components/PendingOrderAlert.vue')['default']
     PendingOrderDot: typeof import('./components/PendingOrderDot.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TelegramBindAlert: typeof import('./components/TelegramBindAlert.vue')['default']
+    TicketDot: typeof import('./components/TicketDot.vue')['default']
     TrafficBarChart: typeof import('./components/TrafficBarChart.vue')['default']
   }
   export interface ComponentCustomProperties {

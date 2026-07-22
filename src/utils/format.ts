@@ -7,7 +7,9 @@ export function formatBytes(n: number): string {
     v /= 1024
     i++
   }
-  return `${v.toFixed(v >= 100 ? 0 : 2)} ${units[i]}`
+  // Up to 2 decimals, dropping unnecessary trailing zeros so values stay uniform
+  // (e.g. 200 -> "200G", 50 -> "50G", 50.5 -> "50.5G").
+  return `${parseFloat(v.toFixed(2))} ${units[i]}`
 }
 
 // formatPrice renders a server-side amount (cents) as ¥ currency.

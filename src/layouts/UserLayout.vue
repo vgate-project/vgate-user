@@ -6,9 +6,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { usePendingOrderStore } from '@/stores/pendingOrder'
 import { useTelegramStore } from '@/stores/telegram'
+import { useTicketStore } from '@/stores/ticket'
 import { apiAnnouncements } from '@/api/announcements'
 import PendingOrderAlert from '@/components/PendingOrderAlert.vue'
 import PendingOrderDot from '@/components/PendingOrderDot.vue'
+import TicketDot from '@/components/TicketDot.vue'
 import TelegramBindAlert from '@/components/TelegramBindAlert.vue'
 import type { Announcement } from '@/types'
 
@@ -18,6 +20,7 @@ const route = useRoute()
 const router = useRouter()
 const pending = usePendingOrderStore()
 const telegram = useTelegramStore()
+const ticket = useTicketStore()
 const collapsed = ref(false)
 
 // Active announcements pushed by admins; pinned items first (server order).
@@ -83,6 +86,7 @@ function onLogout() {
 onMounted(() => {
   pending.refresh()
   telegram.refresh()
+  ticket.refresh()
   loadAnnouncements()
   app.loadSiteName()
 })
@@ -92,6 +96,7 @@ onMounted(() => {
 router.afterEach(() => {
   pending.refresh()
   telegram.refresh()
+  ticket.refresh()
 })
 </script>
 
@@ -115,11 +120,14 @@ router.afterEach(() => {
           <template #title>
             {{ m.label }}
             <PendingOrderDot v-if="m.name === 'orders'" />
+            <TicketDot v-if="m.name === 'tickets'" />
           </template>
         </el-menu-item>
       </el-menu>
       <div class="aside-footer" :class="{ collapsed }">
-        <el-tag v-if="!collapsed" size="small" class="user-tag">{{ auth.username || auth.userId }}</el-tag>
+        <el-tooltip v-if="!collapsed" :content="auth.username || auth.userId" placement="top">
+          <el-tag size="small" class="user-tag">{{ auth.username || auth.userId }}</el-tag>
+        </el-tooltip>
         <div class="footer-actions">
           <el-button v-if="!collapsed" text @click="onLogout">Logout</el-button>
           <el-button text :title="collapsed ? 'Expand' : 'Collapse'" @click="collapsed = !collapsed">
@@ -192,26 +200,31 @@ router.afterEach(() => {
 }
 .aside-footer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
   padding: 12px 16px;
   border-top: 1px solid #e4e7ed;
 }
 .aside-footer.collapsed {
-  justify-content: center;
+  align-items: center;
   padding: 10px;
 }
+/* The tooltip wrapper must be full-width so the tag can stretch. */
+.aside-footer .el-tooltip {
+  width: 100%;
+}
 .user-tag {
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
+  white-space: nowrap;
 }
 .footer-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
-  margin-left: auto;
 }
 .main {
   padding: 24px;

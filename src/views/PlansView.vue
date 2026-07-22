@@ -6,6 +6,7 @@ import { apiTrafficPackage } from '@/api/traffic'
 import { apiOrder } from '@/api/order'
 import { usePendingOrderStore } from '@/stores/pendingOrder'
 import { formatBytes, formatPrice } from '@/utils/format'
+import { renderDescription } from '@/utils/description'
 import type { Plan, PlanPrice, TrafficPackage } from '@/types/api'
 import { OrderKindPlan, OrderKindTraffic } from '@/types/api'
 import PaymentDialog from '@/components/PaymentDialog.vue'
@@ -148,7 +149,7 @@ onMounted(async () => {
       <el-tab-pane label="Subscription Plans">
         <el-empty v-if="!loading && plans.length === 0" description="No plans available" />
         <el-row :gutter="16">
-          <el-col v-for="plan in plans" :key="plan.id" :span="8">
+          <el-col v-for="plan in plans" :key="plan.id" :span="6">
             <el-card shadow="hover" class="plan-card">
               <div class="plan-name">{{ plan.name }}</div>
               <el-divider />
@@ -171,7 +172,8 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <p class="plan-desc">{{ plan.description || '—' }}</p>
+              <div v-if="plan.description" class="plan-desc" v-html="renderDescription(plan.description)" />
+              <p v-else class="plan-desc">—</p>
               <el-button
                 type="primary"
                 style="width: 100%"
@@ -197,7 +199,8 @@ onMounted(async () => {
                 <li>Traffic: {{ pkg.quota_bytes > 0 ? formatBytes(pkg.quota_bytes) : 'Unlimited' }}</li>
                 <li>Validity: {{ pkg.validity_days > 0 ? pkg.validity_days + ' days' : 'No expiry' }}</li>
               </ul>
-              <p class="plan-desc">{{ pkg.description || '—' }}</p>
+              <div v-if="pkg.description" class="plan-desc" v-html="renderDescription(pkg.description)" />
+              <p v-else class="plan-desc">—</p>
               <el-button
                 type="success"
                 style="width: 100%"
@@ -217,10 +220,27 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.plan-card {
-  margin-bottom: 16px;
-  height: 100%;
+/* Make each grid column a flex container so the cards inside stretch to the
+   same height as the tallest card in the row. */
+.el-row > .el-col {
+  display: flex;
 }
+.plan-card {
+  flex: 1;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+}
+/* Stack the card body content vertically and pin the Buy button to the
+   bottom so equal-height cards look aligned. */
+.plan-card :deep(.el-card__body) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+/* The description carries the auto top-margin (see .plan-desc below), which
+   pushes it to the bottom of the card just above the Buy button. The button
+   itself no longer needs an auto margin. */
 .plan-name {
   font-size: 16px;
   font-weight: 600;
@@ -246,7 +266,10 @@ onMounted(async () => {
   font-size: 12px;
   color: #909399;
   min-height: 32px;
-  margin: 8px 0 12px;
+  /* Push the description to the bottom of the card so it lines up with the
+     Buy button across cards that have differing content above it. */
+  margin-top: auto;
+  margin-bottom: 12px;
 }
 .price-options {
   display: flex;

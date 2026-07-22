@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { apiRedemption } from '@/api/redemption'
 import type { RedeemRequest, RedemptionRecord, RedeemType } from '@/types'
-import { formatDateTime, formatBytes } from '@/utils/format'
+import { formatDateTime } from '@/utils/format'
 
 const code = ref('')
 const redeeming = ref(false)

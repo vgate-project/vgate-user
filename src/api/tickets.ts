@@ -10,6 +10,7 @@ export const apiTickets = {
   reply: (id: string, content: string) =>
     http.post<Ticket>(`/user/tickets/${id}/messages`, { content }),
   close: (id: string) => http.post<Ticket>(`/user/tickets/${id}/close`),
+  unread: () => http.get<{ count: number }>('/user/tickets/unread'),
 }
 
 export type { TicketPriority }
