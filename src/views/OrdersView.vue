@@ -135,7 +135,7 @@ onMounted(fetchOrders)
 
     <template v-else>
       <el-table :data="orders" border stripe style="width: 100%">
-        <el-table-column prop="out_trade_no" label="Order No." min-width="180" />
+        <el-table-column prop="id" label="Order ID" min-width="180" />
         <el-table-column label="Amount" width="120">
           <template #default="{ row }">
             {{ formatPrice(row.amount) }}
@@ -159,8 +159,8 @@ onMounted(fetchOrders)
         <el-table-column label="Paid At" min-width="170">
           <template #default="{ row }">{{ formatDateTime(row.paid_at) }}</template>
         </el-table-column>
-        <el-table-column prop="alipay_trade_no" label="Alipay Trade No." min-width="180">
-          <template #default="{ row }">{{ row.alipay_trade_no || '—' }}</template>
+        <el-table-column prop="out_trade_no" label="Out Trade No." min-width="180">
+          <template #default="{ row }">{{ row.out_trade_no || '—' }}</template>
         </el-table-column>
         <el-table-column label="Actions" width="160" fixed="right">
           <template #default="{ row }">

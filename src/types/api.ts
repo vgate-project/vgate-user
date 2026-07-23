@@ -91,7 +91,7 @@ export interface Order {
   amount: number // cents, copied from source
   status: string // pending | paid | closed
   out_trade_no: string
-  alipay_trade_no?: string
+  trade_no?: string // gateway-assigned transaction id
   platform?: string // payment gateway: alipay | manual | (future)
   paid_at?: string | null
   expired_at?: string | null
@@ -109,7 +109,6 @@ export interface CreateOrderRequest {
   plan_id?: string // required when kind=plan or kind=reset
   plan_price_id?: string // required when kind=plan
   traffic_package_id?: string // required when kind=traffic
-  channel?: string // optional: "pc" | "wap" | "" (auto by UA)
   platform?: string // payment gateway; defaults to alipay
 }
 
