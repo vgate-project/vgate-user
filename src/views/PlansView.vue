@@ -151,7 +151,18 @@ onMounted(async () => {
         <el-row :gutter="16">
           <el-col v-for="plan in plans" :key="plan.id" :span="6">
             <el-card shadow="hover" class="plan-card">
-              <div class="plan-name">{{ plan.name }}</div>
+              <div class="plan-name">
+                {{ plan.name }}
+                <el-tag
+                  v-if="!plan.enabled && plan.allow_renew_off_shelf"
+                  size="small"
+                  type="warning"
+                  effect="plain"
+                  style="margin-left: 8px"
+                >
+                  Off-shelf · renew only
+                </el-tag>
+              </div>
               <el-divider />
               <ul class="plan-meta">
                 <li>Traffic: {{ plan.quota_bytes > 0 ? formatBytes(plan.quota_bytes) : 'Unlimited' }}</li>
@@ -180,7 +191,7 @@ onMounted(async () => {
                 :loading="buyingId === 'plan:' + plan.id + ':' + (selectedPriceFor(plan)?.id ?? '')"
                 @click="buyPlan(plan)"
               >
-                Buy
+                {{ plan.enabled ? 'Buy' : 'Renew' }}
               </el-button>
             </el-card>
           </el-col>

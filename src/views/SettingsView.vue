@@ -19,6 +19,33 @@ const form = reactive({
 })
 const saving = ref(false)
 
+// Traffic reminder channel selection. The backend stores "" for "auto"; we use
+// the value "auto" in the UI because el-select cannot display an option whose
+// value is an empty string. The empty/auto mapping is converted at the
+// load/save boundary so the backend contract stays unchanged.
+const reminderOptions = [
+  { label: 'Auto (Telegram if linked, else email)', value: 'auto' },
+  { label: 'Email', value: 'email' },
+  { label: 'Telegram', value: 'telegram' },
+  { label: 'None (disable)', value: 'none' },
+]
+const reminderChannel = ref<string>('auto')
+const savingReminder = ref(false)
+
+async function saveReminder() {
+  savingReminder.value = true
+  try {
+    const ch = reminderChannel.value === 'auto' ? '' : reminderChannel.value
+    await apiUser.setReminderChannel(ch)
+    if (profile.value) profile.value.reminder_channel = ch
+    ElMessage.success('Reminder channel updated')
+  } catch {
+    // Error already surfaced by the http interceptor.
+  } finally {
+    savingReminder.value = false
+  }
+}
+
 // Self-service username editing.
 const usernameForm = reactive({
   username: '',
@@ -46,6 +73,8 @@ async function loadProfile() {
     const {data} = await apiUser.profile()
     profile.value = data
     usernameForm.username = data.username ?? ''
+    const ch = data.reminder_channel
+    reminderChannel.value = ch === '' || ch == null ? 'auto' : ch
   } finally {
     loadingProfile.value = false
   }
@@ -325,6 +354,38 @@ onUnmounted(stopPolling)
 
       <el-card shadow="never">
         <template #header>
+          <span>Traffic Reminder</span>
+        </template>
+        <el-descriptions :column="1" border label-width="160px">
+          <el-descriptions-item label="Reminder channel">
+            <el-select v-model="reminderChannel" style="width: 100%">
+              <el-option
+                v-for="opt in reminderOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </el-descriptions-item>
+        </el-descriptions>
+        <p class="hint-text">
+          When you approach your traffic quota or your quota reset is near, we notify you here.
+          "Auto" uses Telegram if you've linked it, otherwise email. Your admin controls the
+          thresholds and frequency.
+        </p>
+        <div style="margin-top: 12px; display: flex; gap: 8px">
+          <el-button
+            type="primary"
+            :loading="savingReminder"
+            @click="saveReminder"
+          >
+            Save
+          </el-button>
+        </div>
+      </el-card>
+
+      <el-card shadow="never">
+        <template #header>
           <span>Change Password</span>
         </template>
         <el-form label-position="left" label-width="150px">
@@ -376,6 +437,12 @@ onUnmounted(stopPolling)
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+.hint-text {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.6;
 }
 /* Collapse to fewer columns on narrower viewports so cards stay readable. */
 @media (max-width: 1100px) {

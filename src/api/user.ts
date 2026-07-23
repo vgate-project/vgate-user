@@ -30,4 +30,8 @@ export const apiUser = {
   telegramUnbind: () => http.post<void>('/user/telegram/unbind'),
   // PUT /user/telegram/notify — toggle announcement opt-in.
   telegramNotify: (notify: boolean) => http.put<void>('/user/telegram/notify', { notify }),
+  // PUT /user/reminder-channel — choose how the caller receives traffic
+  // reminders. channel is "" (auto), "email", "telegram", or "none".
+  setReminderChannel: (channel: string) =>
+    http.put<void>('/user/reminder-channel', { channel }),
 }

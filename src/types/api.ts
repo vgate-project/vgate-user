@@ -27,6 +27,9 @@ export interface User {
   // not exposed; only the derived link flag and the notification opt-in.
   telegram_bound?: boolean
   telegram_notify?: boolean
+  // reminder_channel selects how the user receives traffic reminders:
+  // "" (auto), "email", "telegram", or "none". Mirrors model.User.ReminderChannel.
+  reminder_channel?: string
   // Per-user speed cap (bytes/sec, 0 = unlimited). Effective cap is the
   // minimum of this and the node's global limit; sourced from the active plan.
   speed_limit_up_bps?: number
@@ -55,6 +58,7 @@ export interface Plan {
   description: string
   level: number
   enabled: boolean
+  allow_renew_off_shelf?: boolean
   prices?: PlanPrice[]
   created_at: string
   updated_at: string
