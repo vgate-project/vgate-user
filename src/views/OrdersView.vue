@@ -150,7 +150,7 @@ onMounted(fetchOrders)
         </el-table-column>
         <el-table-column label="Platform" width="120" prop="platform">
           <template #default="{ row }">
-            <el-tag size="small" effect="plain">{{ row.platform || 'alipay' }}<template v-if="row.channel"> · {{ row.channel }}</template></el-tag>
+            <el-tag size="small" effect="plain">{{ row.platform || 'alipay' }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="Created" min-width="170">

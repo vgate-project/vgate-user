@@ -93,7 +93,6 @@ export interface Order {
   out_trade_no: string
   alipay_trade_no?: string
   platform?: string // payment gateway: alipay | manual | (future)
-  channel: string // alipay-only: pc | wap
   paid_at?: string | null
   expired_at?: string | null
   created_at: string
