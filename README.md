@@ -101,6 +101,7 @@ in) completes verification and clears the banner.
   - `/orders` — order history and pending orders
   - `/traffic` — traffic usage
   - `/invites` — invite codes / referral
+  - `/redeem` — redeem an invite or redemption code
   - `/announcements` — system announcements
   - `/tickets` — support tickets (open, reply, close; choose Telegram/email notifications)
   - `/settings` — account settings / change password, and link a Telegram account
