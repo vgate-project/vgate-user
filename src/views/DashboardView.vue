@@ -210,6 +210,7 @@ function pollUntilResetPaid(orderId: string) {
 const payVisible = ref(false)
 const payUrl = ref('')
 const payMode = ref<'redirect' | 'qr'>('redirect')
+const payPlatform = ref('')
 
 async function onResetTraffic() {
   const pid = profile.value?.current_product_id
@@ -220,6 +221,7 @@ async function onResetTraffic() {
     if (data.pay_url) {
       payUrl.value = data.pay_url
       payMode.value = data.pay_mode === 'qr' ? 'qr' : 'redirect'
+      payPlatform.value = data.order?.platform ?? ''
       if (payMode.value === 'qr') {
         payVisible.value = true
       } else {
@@ -430,7 +432,7 @@ onMounted(async () => {
       <TrafficBarChart :data="hourly" />
     </el-card>
 
-    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" />
+    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" />
   </div>
 </template>
 

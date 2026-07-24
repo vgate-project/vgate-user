@@ -74,6 +74,7 @@ const payingId = ref('')
 const payVisible = ref(false)
 const payUrl = ref('')
 const payMode = ref<'redirect' | 'qr'>('redirect')
+const payPlatform = ref('')
 
 async function pay(order: Order) {
   payingId.value = order.id
@@ -82,6 +83,7 @@ async function pay(order: Order) {
     if (data.pay_url) {
       payUrl.value = data.pay_url
       payMode.value = data.pay_mode === 'qr' ? 'qr' : 'redirect'
+      payPlatform.value = order.platform ?? ''
       if (payMode.value === 'qr') {
         payVisible.value = true
       } else {
@@ -198,6 +200,6 @@ onMounted(fetchOrders)
       </div>
     </template>
 
-    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" />
+    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" />
   </div>
 </template>

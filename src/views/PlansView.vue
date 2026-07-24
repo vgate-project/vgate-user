@@ -22,10 +22,12 @@ const pending = usePendingOrderStore()
 const payVisible = ref(false)
 const payUrl = ref('')
 const payMode = ref<'redirect' | 'qr'>('redirect')
+const payPlatform = ref('')
 
-function presentPayment(payUrlValue: string, payModeValue?: string) {
+function presentPayment(payUrlValue: string, payModeValue?: string, platformValue?: string) {
   payUrl.value = payUrlValue
   payMode.value = payModeValue === 'qr' ? 'qr' : 'redirect'
+  payPlatform.value = platformValue ?? ''
   if (payMode.value === 'qr') {
     payVisible.value = true
   } else {
@@ -67,7 +69,7 @@ async function buyPlan(plan: Plan) {
       plan_price_id: price.id,
     })
     if (data.pay_url) {
-      presentPayment(data.pay_url, data.pay_mode)
+      presentPayment(data.pay_url, data.pay_mode, data.order?.platform)
       ElMessage.success('Order created. Please complete payment.')
       pending.refresh()
       pollUntilPaid(data.order.id)
@@ -89,7 +91,7 @@ async function buyTraffic(pkg: TrafficPackage) {
       traffic_package_id: pkg.id,
     })
     if (data.pay_url) {
-      presentPayment(data.pay_url, data.pay_mode)
+      presentPayment(data.pay_url, data.pay_mode, data.order?.platform)
       ElMessage.success('Order created. Please complete payment.')
       pending.refresh()
       pollUntilPaid(data.order.id)
@@ -226,7 +228,7 @@ onMounted(async () => {
       </el-tab-pane>
     </el-tabs>
 
-    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" />
+    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" />
   </div>
 </template>
 
