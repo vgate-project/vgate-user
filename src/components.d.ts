@@ -45,6 +45,7 @@ declare module 'vue' {
     ElTag: typeof import('element-plus/es')['ElTag']
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     PaymentDialog: typeof import('./components/PaymentDialog.vue')['default']
+    PaymentMethodDialog: typeof import('./components/PaymentMethodDialog.vue')['default']
     PendingOrderAlert: typeof import('./components/PendingOrderAlert.vue')['default']
     PendingOrderDot: typeof import('./components/PendingOrderDot.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

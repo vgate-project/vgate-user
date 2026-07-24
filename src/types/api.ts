@@ -44,6 +44,7 @@ export interface User {
 export interface ChangePlanRequest {
   plan_id: string
   plan_price_id: string
+  platform?: string // chosen payment gateway for the top-up; optional
 }
 
 // ChangePlanResult is returned by POST /user/change-plan (and GET
@@ -54,7 +55,7 @@ export interface ChangePlanRequest {
 export interface ChangePlanResult {
   order?: Order
   pay_url: string
-  pay_mode?: 'redirect' | 'qr'
+  pay_mode?: PaymentMethodMode
   paid: boolean
   credit_cents: number // old plan's remaining value credited to the wallet
   net_charge_cents: number // net amount charged (to wallet or gateway; negative = refund)
@@ -136,7 +137,7 @@ export interface Order {
   status: string // pending | paid | closed
   out_trade_no: string
   trade_no?: string // gateway-assigned transaction id
-  platform?: string // payment gateway: alipay | manual | (future)
+  platform?: string // payment gateway: alipay | wechat | stripe | paypal | apple | manual | balance
   paid_at?: string | null
   expired_at?: string | null
   created_at: string
@@ -153,15 +154,28 @@ export interface CreateOrderRequest {
   plan_id?: string // required when kind=plan or kind=reset
   plan_price_id?: string // required when kind=plan
   traffic_package_id?: string // required when kind=traffic
-  platform?: string // payment gateway; defaults to alipay
+  platform?: string // payment gateway; when empty the server picks the first enabled, configured channel
 }
 
 export interface CreateOrderResponse {
   order: Order
   pay_url: string
-  // How to present pay_url to the user: "redirect" (open in browser) or
-  // "qr" (render pay_url as a QR code to scan, e.g. wechat NATIVE).
-  pay_mode?: 'redirect' | 'qr'
+  // How to present pay_url to the user: "redirect" (open in browser),
+  // "qr" (render pay_url as a QR code to scan, e.g. wechat NATIVE), or
+  // "iap" (an in-app purchase completed inside a native app, e.g. Apple).
+  pay_mode?: PaymentMethodMode
+}
+
+// Payment channel mode returned by GET /user/payment-methods.
+export type PaymentMethodMode = 'redirect' | 'qr' | 'iap'
+
+// A payment channel surfaced to the user for the method picker.
+export interface PaymentMethodInfo {
+  platform: string
+  label: string
+  mode: PaymentMethodMode
+  enabled: boolean
+  configured: boolean
 }
 
 // UserNode mirrors dto.UserNodeView (manager/internal/api/dto/dto.go).
@@ -197,4 +211,17 @@ export interface Page<T> {
   total: number
   page: number
   page_size: number
+}
+
+// UserDashboard is the single payload returned by GET /user/dashboard, bundling
+// the user home page and global badge data (previously several endpoints).
+export interface UserDashboard {
+  profile: User
+  hourly_traffic: HourlyStat[]
+  recent_orders: Page<Order>
+  nodes: UserNode[]
+  announcements: import('@/types').Announcement[]
+  unread_tickets: number
+  telegram_status: { bound: boolean; telegram_notify: boolean; available: boolean }
+  pending_order: Order | null
 }

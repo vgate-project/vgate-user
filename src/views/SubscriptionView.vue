@@ -1,18 +1,30 @@
 <script setup lang="ts">
-import {onMounted, ref} from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import QRCode from 'qrcode'
-import {ElMessage, ElMessageBox} from 'element-plus'
-import {apiUser} from '@/api/user'
-import type {User} from '@/types/api'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { apiUser } from '@/api/user'
+import { useDashboardStore } from '@/stores/dashboard'
 
-const profile = ref<User | null>(null)
+const dashboard = useDashboardStore()
+
+const profile = computed(() => dashboard.profile)
 const links = ref('')
 const base64 = ref('')
-const shareUrl = ref('')
 const qrDataUrl = ref('')
 const loading = ref(true)
 const rotating = ref(false)
 const resetting = ref(false)
+
+// Share URL is derived locally from the subscription token (same rule the
+// backend uses); no separate /user/subscribe-url request needed.
+const apiBase = computed(() => {
+  const cfg = window.__ENV__?.API_BASE_URL
+  if (cfg) return cfg.replace(/\/$/, '')
+  return `${window.location.origin}/api/v1`
+})
+const shareUrl = computed(() =>
+  profile.value ? `${apiBase.value}/sub/${profile.value.sub_token}` : '',
+)
 
 async function copy(text: string) {
   if (!text) return
@@ -25,17 +37,13 @@ async function copy(text: string) {
 }
 
 async function loadAll() {
-  const [p, l, b, u] = await Promise.all([
-    apiUser.profile(),
-    apiUser.subscribe(),
-    apiUser.subscribe('base64'),
-    apiUser.subscribeUrl(),
-  ])
-  profile.value = p.data
-  links.value = l.data
-  base64.value = b.data
-  shareUrl.value = u.data.url
-  qrDataUrl.value = await QRCode.toDataURL(shareUrl.value, {margin: 1, width: 240})
+  // Refresh the shared profile (for sub_token) and fetch both subscription
+  // formats in a single request.
+  await dashboard.refresh()
+  const { data } = await apiUser.subscribeMulti(['raw', 'base64'])
+  links.value = data.raw ?? ''
+  base64.value = data.base64 ?? ''
+  qrDataUrl.value = await QRCode.toDataURL(shareUrl.value, { margin: 1, width: 240 })
 }
 
 onMounted(async () => {

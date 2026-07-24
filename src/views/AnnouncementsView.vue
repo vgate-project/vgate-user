@@ -1,26 +1,26 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { apiAnnouncements } from '@/api/announcements'
+import { useDashboardStore } from '@/stores/dashboard'
 import type { Announcement } from '@/types'
 import { formatDateTime } from '@/utils/format'
 
-const announcements = ref<Announcement[]>([])
+const dashboard = useDashboardStore()
+// Announcements come from the shared dashboard payload (one fetch for the
+// whole app), not a separate per-page request.
+const announcements = computed<Announcement[]>(() => dashboard.announcements)
 const loading = ref(false)
 
-async function load() {
+onMounted(async () => {
   loading.value = true
   try {
-    const { data } = await apiAnnouncements.list()
-    announcements.value = data.items || []
+    await dashboard.refresh()
   } catch {
     ElMessage.error('Failed to load announcements')
-    announcements.value = []
   } finally {
     loading.value = false
   }
-}
-onMounted(load)
+})
 </script>
 
 <template>

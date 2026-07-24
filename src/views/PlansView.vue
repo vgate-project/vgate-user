@@ -4,22 +4,25 @@ import { ElMessage } from 'element-plus'
 import { apiPlan } from '@/api/plan'
 import { apiTrafficPackage } from '@/api/traffic'
 import { apiOrder } from '@/api/order'
-import { apiUser } from '@/api/user'
 import { apiChangePlan } from '@/api/changeplan'
-import { usePendingOrderStore } from '@/stores/pendingOrder'
+import { apiPayment } from '@/api/payment'
+import { useDashboardStore } from '@/stores/dashboard'
 import { formatBytes, formatPrice } from '@/utils/format'
 import { renderDescription } from '@/utils/description'
-import type { Plan, PlanPrice, TrafficPackage, User } from '@/types/api'
+import type { Plan, PlanPrice, TrafficPackage, PaymentMethodInfo } from '@/types/api'
 import { OrderKindPlan, OrderKindTraffic } from '@/types/api'
 import PaymentDialog from '@/components/PaymentDialog.vue'
+import PaymentMethodDialog from '@/components/PaymentMethodDialog.vue'
 
-const pending = usePendingOrderStore()
+const dashboard = useDashboardStore()
 
 const plans = ref<Plan[]>([])
 const packages = ref<TrafficPackage[]>([])
 const loading = ref(true)
 const buyingId = ref('')
-const profile = ref<User | null>(null)
+// The caller's profile is read from the shared dashboard payload (no separate
+// /user/profile request), and kept fresh by dashboard.refresh() after actions.
+const profile = computed(() => dashboard.profile)
 
 // The plan the user currently holds (active plan only).
 const currentPlanId = computed(() => profile.value?.current_product_id ?? '')
@@ -28,20 +31,44 @@ const currentPlanId = computed(() => profile.value?.current_product_id ?? '')
 // for alipay/stripe (pay_mode="redirect").
 const payVisible = ref(false)
 const payUrl = ref('')
-const payMode = ref<'redirect' | 'qr'>('redirect')
+const payMode = ref<'redirect' | 'qr' | 'iap'>('redirect')
 const payPlatform = ref('')
 const payAmount = ref<number | undefined>()
 
 function presentPayment(payUrlValue: string, payModeValue?: string, platformValue?: string, amountValue?: number) {
   payUrl.value = payUrlValue
-  payMode.value = payModeValue === 'qr' ? 'qr' : 'redirect'
+  payMode.value = (payModeValue === 'qr' || payModeValue === 'iap' ? payModeValue : 'redirect') as 'redirect' | 'qr' | 'iap'
   payPlatform.value = platformValue ?? ''
   payAmount.value = amountValue
-  if (payMode.value === 'qr') {
+  if (payMode.value === 'qr' || payMode.value === 'iap') {
+    // QR: render a scannable code. IAP (Apple): the native app completes the
+    // purchase; the web just shows an instruction and polls for completion.
     payVisible.value = true
   } else {
     window.open(payUrlValue, '_blank')
   }
+}
+
+// Available payment channels (admin-enabled + configured), used by the method
+// picker.
+const paymentMethods = ref<PaymentMethodInfo[]>([])
+const methodDialogVisible = ref(false)
+const methodAction = ref<(platform: string) => Promise<void>>(async () => {})
+
+// Open the channel picker, running `action` with the chosen platform on
+// confirm. If only one channel is available we skip the picker.
+function openPicker(action: (platform: string) => Promise<void>) {
+  const available = paymentMethods.value.filter((m) => m.enabled && m.configured)
+  if (available.length <= 1) {
+    void action(available[0]?.platform ?? '')
+    return
+  }
+  methodAction.value = action
+  methodDialogVisible.value = true
+}
+
+async function onMethodSelected(platform: string) {
+  await methodAction.value(platform)
 }
 
 // Selected price id per plan (keyed by plan id) so the user picks a billing
@@ -70,17 +97,21 @@ async function buyPlan(plan: Plan) {
     ElMessage.warning('Please select a billing period')
     return
   }
+  openPicker((platform) => doBuyPlan(plan, price, platform))
+}
+
+async function doBuyPlan(plan: Plan, price: PlanPrice, platform: string) {
   buyingId.value = 'plan:' + plan.id + ':' + price.id
   try {
     const { data } = await apiOrder.create({
       kind: OrderKindPlan,
       plan_id: plan.id,
       plan_price_id: price.id,
+      platform,
     })
-    if (data.pay_url) {
+    if (data.pay_url || data.pay_mode === 'iap') {
       presentPayment(data.pay_url, data.pay_mode, data.order?.platform, data.order?.amount)
       ElMessage.success('Order created. Please complete payment.')
-      pending.refresh()
       pollUntilPaid(data.order.id)
     } else {
       ElMessage.warning('No payment link returned.')
@@ -93,16 +124,20 @@ async function buyPlan(plan: Plan) {
 }
 
 async function buyTraffic(pkg: TrafficPackage) {
+  openPicker((platform) => doBuyTraffic(pkg, platform))
+}
+
+async function doBuyTraffic(pkg: TrafficPackage, platform: string) {
   buyingId.value = 'traffic:' + pkg.id
   try {
     const { data } = await apiOrder.create({
       kind: OrderKindTraffic,
       traffic_package_id: pkg.id,
+      platform,
     })
-    if (data.pay_url) {
+    if (data.pay_url || data.pay_mode === 'iap') {
       presentPayment(data.pay_url, data.pay_mode, data.order?.platform, data.order?.amount)
       ElMessage.success('Order created. Please complete payment.')
-      pending.refresh()
       pollUntilPaid(data.order.id)
     } else {
       ElMessage.warning('No payment link returned.')
@@ -125,6 +160,10 @@ async function switchPlan(plan: Plan) {
     ElMessage.warning('Please select a billing period')
     return
   }
+  openPicker((platform) => doSwitchPlan(plan, price, platform))
+}
+
+async function doSwitchPlan(plan: Plan, price: PlanPrice, platform: string) {
   buyingId.value = 'switch:' + plan.id + ':' + price.id
   try {
     // Preview the proration (non-mutating) so we can show the exact remaining
@@ -157,16 +196,15 @@ async function switchPlan(plan: Plan) {
       return // user cancelled
     }
 
-    const { data } = await apiChangePlan.changePlan({ plan_id: plan.id, plan_price_id: price.id })
+    const { data } = await apiChangePlan.changePlan({ plan_id: plan.id, plan_price_id: price.id, platform })
     if (data.paid) {
       ElMessage.success(`Switched to ${plan.name}.`)
-      await loadProfile()
+      await dashboard.refresh()
       return
     }
-    if (data.pay_url) {
+    if (data.pay_url || data.pay_mode === 'iap') {
       presentPayment(data.pay_url, data.pay_mode, data.order?.platform, data.order?.amount)
       ElMessage.success('Order created. Complete payment to finish switching.')
-      pending.refresh()
       if (data.order) pollUntilPaid(data.order.id)
     } else {
       ElMessage.warning('No payment link returned.')
@@ -175,16 +213,6 @@ async function switchPlan(plan: Plan) {
     /* error toasted by interceptor */
   } finally {
     buyingId.value = ''
-  }
-}
-
-// Loads the caller's profile so we know which plan is current.
-async function loadProfile() {
-  try {
-    const { data } = await apiUser.profile()
-    profile.value = data
-  } catch {
-    /* non-critical for the plans catalog */
   }
 }
 
@@ -197,12 +225,12 @@ function pollUntilPaid(orderId: string) {
       if (data.status === 'paid') {
         if (pollTimer) clearInterval(pollTimer)
         ElMessage.success('Payment successful. Plan is now active.')
-        pending.refresh()
+        dashboard.refresh()
         payVisible.value = false
       } else if (data.status === 'closed') {
         if (pollTimer) clearInterval(pollTimer)
         ElMessage.info('Order closed. You can purchase again.')
-        pending.refresh()
+        dashboard.refresh()
       }
     } catch {
       /* ignore transient errors during polling */
@@ -215,13 +243,18 @@ function pollUntilPaid(orderId: string) {
 
 onMounted(async () => {
   try {
-    const [plansRes, pkgRes] = await Promise.all([apiPlan.list(), apiTrafficPackage.list()])
+    const [plansRes, pkgRes, methodsRes] = await Promise.all([
+      apiPlan.list(),
+      apiTrafficPackage.list(),
+      apiPayment.getMethods(),
+    ])
     plans.value = plansRes.data
     packages.value = pkgRes.data
+    paymentMethods.value = methodsRes.data ?? []
     plans.value.forEach((p) => {
       if (p.prices && p.prices.length) selectedPrice.value[p.id] = p.prices[0].id
     })
-    await loadProfile()
+    await dashboard.refresh()
   } finally {
     loading.value = false
   }
@@ -323,6 +356,7 @@ onMounted(async () => {
     </el-tabs>
 
     <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" :amount="payAmount" />
+    <PaymentMethodDialog v-model="methodDialogVisible" :methods="paymentMethods" @select="onMethodSelected" />
   </div>
 </template>
 

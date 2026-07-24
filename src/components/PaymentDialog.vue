@@ -64,6 +64,15 @@ watch(
       </div>
       <el-alert v-else-if="error" type="error" :closable="false" title="Failed to render QR code" />
     </div>
+    <div v-else-if="payMode === 'iap'">
+      <p v-if="amountText" class="amount-due">Amount due: {{ amountText }}</p>
+      <el-alert type="info" :closable="false" title="Complete this purchase in the app">
+        <template #default>
+          Please open the iOS app and complete this purchase via the App Store.
+          Once the transaction is verified, your order will be activated automatically.
+        </template>
+      </el-alert>
+    </div>
     <div v-else>
       <p v-if="amountText" class="amount-due">Amount due: {{ amountText }}</p>
       <p style="margin-top: 0">Open the payment page to complete your purchase.</p>

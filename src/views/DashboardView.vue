@@ -2,26 +2,26 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { apiUser } from '@/api/user'
 import { apiAuth } from '@/api/auth'
-import { apiTraffic } from '@/api/traffic'
 import { apiOrder } from '@/api/order'
-import { apiNode } from '@/api/node'
-import { usePendingOrderStore } from '@/stores/pendingOrder'
+import { useAppStore } from '@/stores/app'
+import { useDashboardStore } from '@/stores/dashboard'
 import TrafficBarChart from '@/components/TrafficBarChart.vue'
 import { formatBytes, formatDateTime, formatPrice } from '@/utils/format'
 import { OrderKindReset } from '@/types/api'
 import type { User, HourlyStat, Order, UserNode } from '@/types/api'
-import type { UserConfig } from '@/types'
 import PaymentDialog from '@/components/PaymentDialog.vue'
 
 const router = useRouter()
-const pending = usePendingOrderStore()
+const app = useAppStore()
+const dashboard = useDashboardStore()
 
-const profile = ref<User | null>(null)
-const hourly = ref<HourlyStat[]>([])
-const orders = ref<Order[]>([])
-const nodes = ref<UserNode[]>([])
+// All home-page data comes from the single dashboard payload (the layout
+// shell already loaded it and keeps it fresh via polling).
+const profile = computed<User | null>(() => dashboard.profile)
+const hourly = computed<HourlyStat[]>(() => dashboard.hourlyTraffic)
+const orders = computed<Order[]>(() => dashboard.recentOrders)
+const nodes = computed<UserNode[]>(() => dashboard.nodes)
 const loading = ref(true)
 
 // Email verification banner: an unverified account can log in and manage its
@@ -32,8 +32,7 @@ const emailUnverified = computed(() => !!profile.value && !profile.value.email_v
 // POST /user/resend-verification behind the same captcha as register/verify
 // (see user_auth.go ResendVerification), so when it is enabled we must render
 // a widget and forward the token. This mirrors VerifyEmailView.
-const config = ref<UserConfig | null>(null)
-const captchaEnabled = ref(false)
+const captchaEnabled = computed(() => app.captchaEnabled)
 const captchaToken = ref('')
 const captchaEl = ref<HTMLElement | null>(null)
 let activeWidgetId: number | null = null
@@ -56,7 +55,7 @@ function ensureTurnstile(cb: () => void) {
 
 function renderCaptcha() {
   const el = captchaEl.value
-  const sitekey = config.value?.captcha_site_key
+  const sitekey = app.captchaSiteKey
   if (!el || !(window as any).turnstile || !sitekey) return
   activeWidgetId = (window as any).turnstile.render(el, {
     sitekey,
@@ -194,8 +193,7 @@ function pollUntilResetPaid(orderId: string) {
       if (data.status === 'paid') {
         stopResetPoll()
         ElMessage.success('Payment confirmed. Your traffic has been reset.')
-        await loadAll()
-        pending.refresh()
+        await dashboard.refresh()
         payVisible.value = false
       } else if (data.status === 'closed') {
         stopResetPoll()
@@ -231,7 +229,7 @@ async function onResetTraffic() {
         window.open(data.pay_url, '_blank')
       }
       ElMessage.success('Order created — complete payment to reset traffic.')
-      await pending.refresh()
+      await dashboard.refresh()
       pollUntilResetPaid(data.order.id)
     } else {
       ElMessage.warning('No payment URL returned.')
@@ -243,31 +241,10 @@ async function onResetTraffic() {
   }
 }
 
-async function loadAll() {
-  const [p, h, o, n] = await Promise.all([
-    apiUser.profile(),
-    apiTraffic.hourly(),
-    apiOrder.list({ page: 1, page_size: 20 }),
-    apiNode.listMine(),
-  ])
-  profile.value = p.data
-  hourly.value = h.data
-  orders.value = o.data.items
-  nodes.value = n.data
-}
-
 onMounted(async () => {
-  // Load public captcha config so the resend button can gate behind Turnstile
-  // when the backend has captcha enabled.
+  // Dashboard data is loaded by the shell (and de-duped if already in flight).
   try {
-    const { data } = await apiAuth.getConfig()
-    config.value = data
-    captchaEnabled.value = !!data.captcha_enabled
-  } catch {
-    captchaEnabled.value = false
-  }
-  try {
-    await loadAll()
+    await dashboard.refresh()
   } catch {
     /* errors surfaced per-field via empty state */
   } finally {

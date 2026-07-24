@@ -4,10 +4,12 @@ import {ElMessage} from 'element-plus'
 import {apiAuth} from '@/api/auth'
 import {apiUser} from '@/api/user'
 import {useAuthStore} from '@/stores/auth'
+import {useDashboardStore} from '@/stores/dashboard'
 import type {User} from '@/types/api'
 import {formatBytes, formatDateTime, formatPrice} from '@/utils/format'
 
 const auth = useAuthStore()
+const dashboard = useDashboardStore()
 
 const profile = ref<User | null>(null)
 const loadingProfile = ref(false)
@@ -67,28 +69,19 @@ const tg = reactive({
 
 let pollTimer: ReturnType<typeof setInterval> | undefined
 
-async function loadProfile() {
-  loadingProfile.value = true
-  try {
-    const {data} = await apiUser.profile()
-    profile.value = data
-    usernameForm.username = data.username ?? ''
-    const ch = data.reminder_channel
-    reminderChannel.value = ch === '' || ch == null ? 'auto' : ch
-  } finally {
-    loadingProfile.value = false
-  }
-}
-
-async function loadTelegram() {
-  try {
-    const {data} = await apiUser.telegramStatus()
-    tg.available = data.available
-    tg.bound = data.bound
-    tg.notify = data.telegram_notify
-  } catch {
-    // Telegram is optional; ignore lookup failures.
-  }
+// Hydrate the local view state from the shared dashboard payload, avoiding a
+// second /user/profile and /user/telegram/status request on this page (the
+// shell already loaded both via GET /user/dashboard).
+function syncFromDashboard() {
+  const d = dashboard.data
+  if (!d) return
+  profile.value = d.profile
+  usernameForm.username = d.profile.username ?? ''
+  const ch = d.profile.reminder_channel
+  reminderChannel.value = ch === '' || ch == null ? 'auto' : ch
+  tg.available = d.telegram_status.available
+  tg.bound = d.telegram_status.bound
+  tg.notify = d.telegram_status.telegram_notify
 }
 
 async function bindTelegram() {
@@ -124,6 +117,10 @@ function startPolling() {
         tg.pending = false
         tg.deepLink = ''
         tg.tgLink = ''
+        if (dashboard.data) {
+          dashboard.data.telegram_status.bound = true
+          dashboard.data.telegram_status.telegram_notify = data.telegram_notify
+        }
         stopPolling()
         ElMessage.success('Telegram linked')
         return
@@ -164,6 +161,10 @@ async function unbindTelegram() {
     tg.pending = false
     tg.deepLink = ''
     tg.tgLink = ''
+    if (dashboard.data) {
+      dashboard.data.telegram_status.bound = false
+      dashboard.data.telegram_status.telegram_notify = true
+    }
     stopPolling()
     ElMessage.success('Telegram unlinked')
   } catch {
@@ -177,6 +178,7 @@ async function setNotify(val: boolean) {
   try {
     await apiUser.telegramNotify(val)
     tg.notify = val
+    if (dashboard.data) dashboard.data.telegram_status.telegram_notify = val
   } catch {
     // Error already surfaced by the http interceptor.
   }
@@ -252,9 +254,14 @@ async function onSubmit() {
   }
 }
 
-onMounted(() => {
-  loadProfile()
-  loadTelegram()
+onMounted(async () => {
+  loadingProfile.value = true
+  try {
+    await dashboard.refresh()
+    syncFromDashboard()
+  } finally {
+    loadingProfile.value = false
+  }
 })
 
 onUnmounted(stopPolling)

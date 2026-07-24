@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
-import { usePendingOrderStore } from '@/stores/pendingOrder'
-import { useTelegramStore } from '@/stores/telegram'
-import { useTicketStore } from '@/stores/ticket'
-import { apiAnnouncements } from '@/api/announcements'
+import { useDashboardStore } from '@/stores/dashboard'
 import PendingOrderAlert from '@/components/PendingOrderAlert.vue'
 import PendingOrderDot from '@/components/PendingOrderDot.vue'
 import TicketDot from '@/components/TicketDot.vue'
@@ -18,13 +15,8 @@ const auth = useAuthStore()
 const app = useAppStore()
 const route = useRoute()
 const router = useRouter()
-const pending = usePendingOrderStore()
-const telegram = useTelegramStore()
-const ticket = useTicketStore()
+const dashboard = useDashboardStore()
 const collapsed = ref(false)
-
-// Active announcements pushed by admins; pinned items first (server order).
-const announcements = ref<Announcement[]>([])
 
 // Read state is persisted locally so a marked-as-read announcement stays
 // hidden across reloads (per browser). Keyed by announcement id.
@@ -52,18 +44,11 @@ function markRead(id: string) {
   }
 }
 
-async function loadAnnouncements() {
-  try {
-    const { data } = await apiAnnouncements.list()
-    announcements.value = data.items || []
-  } catch {
-    // Non-critical: a transient failure must not block the app shell.
-    announcements.value = []
-  }
-}
-
-const visibleAnnouncements = () =>
-  announcements.value.filter((a) => !readIds.value.has(a.id))
+// Announcements come from the shared dashboard payload (one fetch for the
+// whole app), not a separate per-page request.
+const visibleAnnouncements = computed(() =>
+  (dashboard.announcements as Announcement[]).filter((a) => !readIds.value.has(a.id)),
+)
 
 const menus = [
   { name: 'dashboard', label: 'Dashboard', icon: 'Odometer' },
@@ -83,20 +68,21 @@ function onLogout() {
   router.push('/login')
 }
 
-onMounted(() => {
-  pending.refresh()
-  telegram.refresh()
-  ticket.refresh()
-  loadAnnouncements()
-  app.loadSiteName()
+// Poll the single dashboard endpoint so the global badges (pending order,
+// telegram link, unread tickets, announcements) stay fresh without re-firing
+// several requests on every client-side navigation.
+let pollTimer: ReturnType<typeof setInterval> | undefined
+
+onMounted(async () => {
+  await dashboard.refresh()
+  app.loadConfig()
+  pollTimer = setInterval(() => {
+    dashboard.refresh()
+  }, 45000)
 })
 
-// Re-evaluate pending orders on every navigation so the alert/dot reflect
-// orders created/paid/closed on other pages without a full reload.
-router.afterEach(() => {
-  pending.refresh()
-  telegram.refresh()
-  ticket.refresh()
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
 })
 </script>
 
@@ -138,7 +124,7 @@ router.afterEach(() => {
     </el-aside>
     <el-container>
       <el-main class="main">
-        <template v-for="a in visibleAnnouncements()" :key="a.id">
+        <template v-for="a in visibleAnnouncements" :key="a.id">
           <el-alert
             :title="a.title"
             :type="a.pinned ? 'warning' : 'info'"
