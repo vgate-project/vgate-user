@@ -34,8 +34,52 @@ export interface User {
   // minimum of this and the node's global limit; sourced from the active plan.
   speed_limit_up_bps?: number
   speed_limit_down_bps?: number
+  // Wallet balance in cents (general ledger, spendable on any future purchase).
+  balance_cents?: number
   created_at: string
   updated_at: string
+}
+
+// ChangePlanRequest is the body for POST /user/change-plan.
+export interface ChangePlanRequest {
+  plan_id: string
+  plan_price_id: string
+}
+
+// ChangePlanResult is returned by POST /user/change-plan (and GET
+// /user/change-plan/preview, where the order/pay fields are omitted). All
+// changes take effect immediately; when paid is true the wallet fully covered
+// the net charge and the effect is already applied. For a preview, paid is
+// false and only credit_cents / net_charge_cents carry meaning.
+export interface ChangePlanResult {
+  order?: Order
+  pay_url: string
+  pay_mode?: 'redirect' | 'qr'
+  paid: boolean
+  credit_cents: number // old plan's remaining value credited to the wallet
+  net_charge_cents: number // net amount charged (to wallet or gateway; negative = refund)
+  immediate: boolean
+}
+
+// BalanceLedgerEntry mirrors a single wallet ledger row (model.BalanceTransaction).
+export interface BalanceLedgerEntry {
+  id: string
+  type: 'credit' | 'debit'
+  amount_cents: number
+  reason: string
+  ref_order_id?: string
+  balance_after: number
+  remark?: string
+  created_at: string
+}
+
+// BalanceResponse mirrors GET /user/balance.
+export interface BalanceResponse {
+  balance_cents: number
+  ledger: BalanceLedgerEntry[]
+  total: number
+  page: number
+  page_size: number
 }
 
 // PlanPrice mirrors model.PlanPrice (manager/internal/model/plan_price.go).

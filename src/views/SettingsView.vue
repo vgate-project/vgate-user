@@ -5,7 +5,7 @@ import {apiAuth} from '@/api/auth'
 import {apiUser} from '@/api/user'
 import {useAuthStore} from '@/stores/auth'
 import type {User} from '@/types/api'
-import {formatBytes, formatDateTime} from '@/utils/format'
+import {formatBytes, formatDateTime, formatPrice} from '@/utils/format'
 
 const auth = useAuthStore()
 
@@ -265,7 +265,7 @@ onUnmounted(stopPolling)
     <h2 style="margin: 0 0 16px">Account Settings</h2>
     <div class="cards-grid">
       <el-card shadow="never" v-loading="loadingProfile">
-        <el-descriptions :column="1" border label-width="120px">
+        <el-descriptions :column="1" border label-width="140px">
           <el-descriptions-item label="Email">
             {{ profile?.email ?? '—' }}
             <el-tag
@@ -298,6 +298,7 @@ onUnmounted(stopPolling)
               {{ profile?.enabled ? 'Enabled' : 'Disabled' }}
             </el-tag>
           </el-descriptions-item>
+          <el-descriptions-item label="Wallet Balance">{{ formatPrice(profile?.balance_cents ?? 0) }}</el-descriptions-item>
         </el-descriptions>
       </el-card>
 

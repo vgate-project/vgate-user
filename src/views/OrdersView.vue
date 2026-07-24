@@ -56,6 +56,7 @@ function pollUntilPaid(orderId: string) {
         ElMessage.success('Payment confirmed. Your plan is active.')
         fetchOrders()
         pending.refresh()
+        payVisible.value = false
       } else if (data.status === 'closed') {
         stopPoll()
         ElMessage.info('Order closed. You may try again.')
@@ -75,6 +76,7 @@ const payVisible = ref(false)
 const payUrl = ref('')
 const payMode = ref<'redirect' | 'qr'>('redirect')
 const payPlatform = ref('')
+const payAmount = ref<number | undefined>()
 
 async function pay(order: Order) {
   payingId.value = order.id
@@ -84,6 +86,7 @@ async function pay(order: Order) {
       payUrl.value = data.pay_url
       payMode.value = data.pay_mode === 'qr' ? 'qr' : 'redirect'
       payPlatform.value = order.platform ?? ''
+      payAmount.value = order.amount
       if (payMode.value === 'qr') {
         payVisible.value = true
       } else {
@@ -200,6 +203,6 @@ onMounted(fetchOrders)
       </div>
     </template>
 
-    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" />
+    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" :amount="payAmount" />
   </div>
 </template>

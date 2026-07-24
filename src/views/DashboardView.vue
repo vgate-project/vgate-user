@@ -9,7 +9,7 @@ import { apiOrder } from '@/api/order'
 import { apiNode } from '@/api/node'
 import { usePendingOrderStore } from '@/stores/pendingOrder'
 import TrafficBarChart from '@/components/TrafficBarChart.vue'
-import { formatBytes, formatDateTime } from '@/utils/format'
+import { formatBytes, formatDateTime, formatPrice } from '@/utils/format'
 import { OrderKindReset } from '@/types/api'
 import type { User, HourlyStat, Order, UserNode } from '@/types/api'
 import type { UserConfig } from '@/types'
@@ -196,6 +196,7 @@ function pollUntilResetPaid(orderId: string) {
         ElMessage.success('Payment confirmed. Your traffic has been reset.')
         await loadAll()
         pending.refresh()
+        payVisible.value = false
       } else if (data.status === 'closed') {
         stopResetPoll()
         ElMessage.info('Order closed. You may try again.')
@@ -211,6 +212,7 @@ const payVisible = ref(false)
 const payUrl = ref('')
 const payMode = ref<'redirect' | 'qr'>('redirect')
 const payPlatform = ref('')
+const payAmount = ref<number | undefined>()
 
 async function onResetTraffic() {
   const pid = profile.value?.current_product_id
@@ -222,6 +224,7 @@ async function onResetTraffic() {
       payUrl.value = data.pay_url
       payMode.value = data.pay_mode === 'qr' ? 'qr' : 'redirect'
       payPlatform.value = data.order?.platform ?? ''
+      payAmount.value = data.order?.amount
       if (payMode.value === 'qr') {
         payVisible.value = true
       } else {
@@ -392,6 +395,7 @@ onMounted(async () => {
             <el-descriptions-item label="Speed limit">{{ speedLimitText }}</el-descriptions-item>
             <el-descriptions-item label="Expires">{{ expireText }}</el-descriptions-item>
             <el-descriptions-item label="Created">{{ formatDateTime(profile?.created_at) }}</el-descriptions-item>
+            <el-descriptions-item label="Wallet Balance">{{ formatPrice(profile?.balance_cents ?? 0) }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>
@@ -432,7 +436,7 @@ onMounted(async () => {
       <TrafficBarChart :data="hourly" />
     </el-card>
 
-    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" />
+    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" :amount="payAmount" />
   </div>
 </template>
 

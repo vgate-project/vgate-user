@@ -10,8 +10,8 @@ export const useAppStore = defineStore('app', {
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
     },
-    // Loads the configured site name from the public user config endpoint.
-    // Falls back to "VGate" on any failure so the UI always has a label.
+    // Loads the public site name from the public user config endpoint. Falls
+    // back to a safe default on failure so the UI always has a value.
     async loadSiteName() {
       try {
         const { data } = await apiAuth.getConfig()

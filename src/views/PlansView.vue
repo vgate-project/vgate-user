@@ -1,21 +1,28 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { apiPlan } from '@/api/plan'
 import { apiTrafficPackage } from '@/api/traffic'
 import { apiOrder } from '@/api/order'
+import { apiUser } from '@/api/user'
+import { apiChangePlan } from '@/api/changeplan'
 import { usePendingOrderStore } from '@/stores/pendingOrder'
 import { formatBytes, formatPrice } from '@/utils/format'
 import { renderDescription } from '@/utils/description'
-import type { Plan, PlanPrice, TrafficPackage } from '@/types/api'
+import type { Plan, PlanPrice, TrafficPackage, User } from '@/types/api'
 import { OrderKindPlan, OrderKindTraffic } from '@/types/api'
 import PaymentDialog from '@/components/PaymentDialog.vue'
+
+const pending = usePendingOrderStore()
 
 const plans = ref<Plan[]>([])
 const packages = ref<TrafficPackage[]>([])
 const loading = ref(true)
 const buyingId = ref('')
-const pending = usePendingOrderStore()
+const profile = ref<User | null>(null)
+
+// The plan the user currently holds (active plan only).
+const currentPlanId = computed(() => profile.value?.current_product_id ?? '')
 
 // Shared payment dialog: shows a QR code for wechat (pay_mode="qr") or a link
 // for alipay/stripe (pay_mode="redirect").
@@ -23,11 +30,13 @@ const payVisible = ref(false)
 const payUrl = ref('')
 const payMode = ref<'redirect' | 'qr'>('redirect')
 const payPlatform = ref('')
+const payAmount = ref<number | undefined>()
 
-function presentPayment(payUrlValue: string, payModeValue?: string, platformValue?: string) {
+function presentPayment(payUrlValue: string, payModeValue?: string, platformValue?: string, amountValue?: number) {
   payUrl.value = payUrlValue
   payMode.value = payModeValue === 'qr' ? 'qr' : 'redirect'
   payPlatform.value = platformValue ?? ''
+  payAmount.value = amountValue
   if (payMode.value === 'qr') {
     payVisible.value = true
   } else {
@@ -69,7 +78,7 @@ async function buyPlan(plan: Plan) {
       plan_price_id: price.id,
     })
     if (data.pay_url) {
-      presentPayment(data.pay_url, data.pay_mode, data.order?.platform)
+      presentPayment(data.pay_url, data.pay_mode, data.order?.platform, data.order?.amount)
       ElMessage.success('Order created. Please complete payment.')
       pending.refresh()
       pollUntilPaid(data.order.id)
@@ -91,7 +100,7 @@ async function buyTraffic(pkg: TrafficPackage) {
       traffic_package_id: pkg.id,
     })
     if (data.pay_url) {
-      presentPayment(data.pay_url, data.pay_mode, data.order?.platform)
+      presentPayment(data.pay_url, data.pay_mode, data.order?.platform, data.order?.amount)
       ElMessage.success('Order created. Please complete payment.')
       pending.refresh()
       pollUntilPaid(data.order.id)
@@ -105,6 +114,80 @@ async function buyTraffic(pkg: TrafficPackage) {
   }
 }
 
+// switchPlan moves the user to a different plan via POST /user/change-plan.
+// All changes apply immediately: the old plan's remaining value is credited to
+// the wallet and the net difference is charged (or refunded). We preview the
+// proration numbers first and confirm with the user so they can see the
+// remaining value and the price to top up before committing.
+async function switchPlan(plan: Plan) {
+  const price = selectedPriceFor(plan)
+  if (!price) {
+    ElMessage.warning('Please select a billing period')
+    return
+  }
+  buyingId.value = 'switch:' + plan.id + ':' + price.id
+  try {
+    // Preview the proration (non-mutating) so we can show the exact remaining
+    // value and net charge before confirming.
+    const { data: preview } = await apiChangePlan.previewChangePlan({
+      plan_id: plan.id,
+      plan_price_id: price.id,
+    })
+    const credit = preview.credit_cents
+    const net = preview.net_charge_cents
+    let detail: string
+    if (net > 0) {
+      detail =
+        `Your current plan's remaining value (${formatPrice(credit)}) will be credited to your wallet.\n` +
+        `You'll pay the difference: ${formatPrice(net)}.`
+    } else if (net < 0) {
+      detail =
+        `Your current plan's remaining value (${formatPrice(credit)}) will be credited to your wallet.\n` +
+        `The new plan is cheaper, so ${formatPrice(-net)} will be refunded to your wallet.`
+    } else {
+      detail = `Your current plan's remaining value (${formatPrice(credit)}) will be credited to your wallet. No extra payment is needed.`
+    }
+    try {
+      await ElMessageBox.confirm(detail, `Switch to ${plan.name}?`, {
+        confirmButtonText: 'Confirm switch',
+        cancelButtonText: 'Cancel',
+        type: 'info',
+      })
+    } catch {
+      return // user cancelled
+    }
+
+    const { data } = await apiChangePlan.changePlan({ plan_id: plan.id, plan_price_id: price.id })
+    if (data.paid) {
+      ElMessage.success(`Switched to ${plan.name}.`)
+      await loadProfile()
+      return
+    }
+    if (data.pay_url) {
+      presentPayment(data.pay_url, data.pay_mode, data.order?.platform, data.order?.amount)
+      ElMessage.success('Order created. Complete payment to finish switching.')
+      pending.refresh()
+      if (data.order) pollUntilPaid(data.order.id)
+    } else {
+      ElMessage.warning('No payment link returned.')
+    }
+  } catch {
+    /* error toasted by interceptor */
+  } finally {
+    buyingId.value = ''
+  }
+}
+
+// Loads the caller's profile so we know which plan is current.
+async function loadProfile() {
+  try {
+    const { data } = await apiUser.profile()
+    profile.value = data
+  } catch {
+    /* non-critical for the plans catalog */
+  }
+}
+
 let pollTimer: ReturnType<typeof setInterval> | null = null
 function pollUntilPaid(orderId: string) {
   if (pollTimer) clearInterval(pollTimer)
@@ -115,6 +198,7 @@ function pollUntilPaid(orderId: string) {
         if (pollTimer) clearInterval(pollTimer)
         ElMessage.success('Payment successful. Plan is now active.')
         pending.refresh()
+        payVisible.value = false
       } else if (data.status === 'closed') {
         if (pollTimer) clearInterval(pollTimer)
         ElMessage.info('Order closed. You can purchase again.')
@@ -137,6 +221,7 @@ onMounted(async () => {
     plans.value.forEach((p) => {
       if (p.prices && p.prices.length) selectedPrice.value[p.id] = p.prices[0].id
     })
+    await loadProfile()
   } finally {
     loading.value = false
   }
@@ -164,6 +249,15 @@ onMounted(async () => {
                 >
                   Off-shelf · renew only
                 </el-tag>
+                <el-tag
+                  v-if="plan.id === currentPlanId"
+                  size="small"
+                  type="success"
+                  effect="plain"
+                  style="margin-left: 8px"
+                >
+                  Current
+                </el-tag>
               </div>
               <el-divider />
               <ul class="plan-meta">
@@ -190,10 +284,10 @@ onMounted(async () => {
               <el-button
                 type="primary"
                 style="width: 100%"
-                :loading="buyingId === 'plan:' + plan.id + ':' + (selectedPriceFor(plan)?.id ?? '')"
-                @click="buyPlan(plan)"
+                :loading="buyingId === (plan.id === currentPlanId ? 'plan:' : 'switch:') + plan.id + ':' + (selectedPriceFor(plan)?.id ?? '')"
+                @click="plan.id === currentPlanId ? buyPlan(plan) : switchPlan(plan)"
               >
-                {{ plan.enabled ? 'Buy' : 'Renew' }}
+                {{ plan.id === currentPlanId ? (plan.enabled ? 'Buy' : 'Renew') : 'Switch' }}
               </el-button>
             </el-card>
           </el-col>
@@ -228,7 +322,7 @@ onMounted(async () => {
       </el-tab-pane>
     </el-tabs>
 
-    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" />
+    <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" :amount="payAmount" />
   </div>
 </template>
 
