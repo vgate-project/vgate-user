@@ -73,7 +73,7 @@ export interface InviteRequest {
 }
 
 // --- Redemption codes ---
-export type RedeemType = 'traffic' | 'duration' | 'plan' | 'reset'
+export type RedeemType = 'traffic' | 'duration' | 'plan'
 
 export interface RedemptionCode {
   id: string
@@ -116,6 +116,7 @@ export interface UserProfile {
   level: number
   expire_at?: string
   quota_bytes: number
+  traffic_quota_bytes?: number
   quota_reset_enabled: boolean
   up_total: number
   down_total: number

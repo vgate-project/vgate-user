@@ -15,7 +15,6 @@ const typeLabel: Record<RedeemType, string> = {
   traffic: 'Traffic',
   duration: 'Duration',
   plan: 'Plan',
-  reset: 'Reset',
 }
 
 async function loadRecords() {
@@ -81,8 +80,7 @@ async function onRedeem() {
       </el-form>
       <p class="hint">
         Each code can be redeemed once per account. Codes grant traffic, extra
-        subscription days, a free plan, or a traffic-usage reset — as configured
-        by the admin.
+        subscription days, or a free plan — as configured by the admin.
       </p>
     </el-card>
 
@@ -99,7 +97,6 @@ async function onRedeem() {
             <span v-if="(row as RedemptionRecord).type === 'traffic'">granted traffic</span>
             <span v-else-if="(row as RedemptionRecord).type === 'duration'">extended subscription</span>
             <span v-else-if="(row as RedemptionRecord).type === 'plan'">applied plan</span>
-            <span v-else>reset traffic usage</span>
           </template>
         </el-table-column>
         <el-table-column label="Redeemed" width="190">

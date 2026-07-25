@@ -2,27 +2,28 @@
 export interface User {
   id: string // stable internal PK (NOT the VLESS credential)
   credential: string // rotatable VLESS UUID in the subscription link / node push
-  current_product_id?: string // currently active plan/traffic-package id
+  current_product_id?: string // currently active plan id (traffic packages are add-ons, never the current product)
   current_product_name?: string // display name of current_product_id (populated by backend)
-  current_product_kind?: string // "plan" | "traffic" — kind of current_product_id (populated by backend)
   email: string
   username?: string | null
   sub_token: string // share-URL credential
   level: number
   expire_at?: string | null
-  quota_bytes: number // -1 = unlimited, 0 = no quota, >0 = capped (bytes)
+  quota_bytes: number // -1 = unlimited, 0 = no quota, >0 = capped (bytes) — base plan quota
+  traffic_quota_bytes?: number // active traffic-package / redemption bonus (added on top of base)
+  // package_used_bytes is the traffic already charged to traffic packages /
+  // redemption grants (persists across base-plan resets).
+  package_used_bytes?: number
+  // traffic_grants lists the user's active grants with per-grant
+  // remaining traffic (quota_bytes - used_bytes).
+  traffic_grants?: TrafficGrantView[]
   quota_reset_enabled: boolean // participates in global monthly reset (day from system config)
   up_total: number
   down_total: number
   last_traffic_at?: string | null
-  last_reset_at?: string | null
   enabled: boolean
   email_verified?: boolean // whether the user proved ownership of Email
   has_password?: boolean // derived: whether the user has a password set
-  // Surfaced by the backend when the active product is a plan with a traffic
-  // reset package: lets the user self-purchase a reset from the dashboard.
-  current_plan_reset_enabled?: boolean
-  current_plan_reset_price?: number // cents
   // Telegram link state (manager/internal/model/user.go). telegram_id is
   // not exposed; only the derived link flag and the notification opt-in.
   telegram_bound?: boolean
@@ -38,6 +39,18 @@ export interface User {
   balance_cents?: number
   created_at: string
   updated_at: string
+}
+
+// TrafficGrantView mirrors model.TrafficGrant for the profile / user-detail
+// responses: each active grant's total and consumed traffic.
+export interface TrafficGrantView {
+  id: string
+  source: 'traffic_package' | 'redemption'
+  source_id?: string
+  name?: string // denormalized display label (package name or redemption code)
+  quota_bytes: number // total granted
+  used_bytes: number // consumed so far (FIFO across grants)
+  granted_at?: string // when the grant (order/redemption) was applied
 }
 
 // ChangePlanRequest is the body for POST /user/change-plan.
@@ -60,6 +73,8 @@ export interface ChangePlanResult {
   credit_cents: number // old plan's remaining value credited to the wallet
   net_charge_cents: number // net amount charged (to wallet or gateway; negative = refund)
   immediate: boolean
+  wallet_used_cents?: number // wallet amount applied to this switch
+  wallet_remaining_cents?: number // wallet balance left after this switch
 }
 
 // BalanceLedgerEntry mirrors a single wallet ledger row (model.BalanceTransaction).
@@ -85,8 +100,6 @@ export interface BalanceResponse {
 
 // PlanPrice mirrors model.PlanPrice (manager/internal/model/plan_price.go).
 export interface PlanPrice {
-  id: string
-  plan_id: string
   period: string // month | quarter | half_year | year
   price: number // cents (server truth)
   duration_days: number
@@ -115,7 +128,6 @@ export interface TrafficPackage {
   name: string
   price: number // cents
   quota_bytes: number
-  validity_days: number // 0 = no expiry extension
   description: string
   enabled: boolean
   created_at: string
@@ -132,7 +144,6 @@ export interface Order {
   period?: string
   duration_days: number
   traffic_package_id?: string
-  validity_days: number
   amount: number // cents, copied from source
   status: string // pending | paid | closed
   out_trade_no: string
@@ -147,11 +158,10 @@ export interface Order {
 // Order kind constants.
 export const OrderKindPlan = 'plan'
 export const OrderKindTraffic = 'traffic'
-export const OrderKindReset = 'reset'
 
 export interface CreateOrderRequest {
-  kind: string // "plan" | "traffic" | "reset"
-  plan_id?: string // required when kind=plan or kind=reset
+  kind: string // "plan" | "traffic"
+  plan_id?: string // required when kind=plan
   plan_price_id?: string // required when kind=plan
   traffic_package_id?: string // required when kind=traffic
   platform?: string // payment gateway; when empty the server picks the first enabled, configured channel
@@ -164,6 +174,12 @@ export interface CreateOrderResponse {
   // "qr" (render pay_url as a QR code to scan, e.g. wechat NATIVE), or
   // "iap" (an in-app purchase completed inside a native app, e.g. Apple).
   pay_mode?: PaymentMethodMode
+  paid: boolean // true when the wallet fully covered the order (no gateway step)
+  // Wallet balance applied to this order and the balance remaining after the
+  // debit. Populated whenever the wallet is used, so the UI can tell the user
+  // the wallet auto-paid instead of the gateway they selected.
+  wallet_used_cents?: number
+  wallet_remaining_cents?: number
 }
 
 // Payment channel mode returned by GET /user/payment-methods.

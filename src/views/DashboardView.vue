@@ -3,13 +3,11 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { apiAuth } from '@/api/auth'
-import { apiOrder } from '@/api/order'
 import { useAppStore } from '@/stores/app'
 import { useDashboardStore } from '@/stores/dashboard'
 import TrafficBarChart from '@/components/TrafficBarChart.vue'
 import { formatBytes, formatDateTime, formatPrice } from '@/utils/format'
-import { OrderKindReset } from '@/types/api'
-import type { User, HourlyStat, Order, UserNode } from '@/types/api'
+import type { User, HourlyStat, Order, UserNode, TrafficGrantView } from '@/types/api'
 import PaymentDialog from '@/components/PaymentDialog.vue'
 
 const router = useRouter()
@@ -114,11 +112,47 @@ watch(
 const usedTotal = computed(() =>
   profile.value ? profile.value.up_total + profile.value.down_total : 0,
 )
-const quota = computed(() => profile.value?.quota_bytes ?? 0)
+// Effective quota: base plan quota (QuotaBytes) + active traffic-package /
+// redemption bonuses (TrafficQuotaBytes). -1 (unlimited) stays -1 regardless.
+function effectiveQuota(u: User | null): number {
+  if (!u) return 0
+  if (u.quota_bytes < 0) return -1 // unlimited
+  return u.quota_bytes + (u.traffic_quota_bytes ?? 0)
+}
+const quota = computed(() => effectiveQuota(profile.value))
+const bonusQuota = computed(() => profile.value?.traffic_quota_bytes ?? 0)
 const quotaUnlimited = computed(() => quota.value === -1)
 const remaining = computed(() =>
   quotaUnlimited.value ? -1 : Math.max(quota.value - usedTotal.value, 0),
 )
+
+// Package-first breakdown: traffic charged to grants is tracked separately
+// (package_used_bytes) and survives base-plan resets.
+const packageUsed = computed(() => profile.value?.package_used_bytes ?? 0)
+const baseUsed = computed(() =>
+  Math.max(0, usedTotal.value - packageUsed.value),
+)
+const baseQuota = computed(() =>
+  profile.value && profile.value.quota_bytes < 0 ? -1 : profile.value?.quota_bytes ?? 0,
+)
+const baseRemaining = computed(() =>
+  baseQuota.value < 0 ? -1 : Math.max(0, baseQuota.value - baseUsed.value),
+)
+const packageRemaining = computed(() => bonusQuota.value)
+const trafficGrants = computed<TrafficGrantView[]>(
+  () => (profile.value?.traffic_grants ?? []) as TrafficGrantView[],
+)
+function grantRemaining(g: TrafficGrantView): number {
+  return Math.max(0, g.quota_bytes - (g.used_bytes ?? 0))
+}
+function grantPct(g: TrafficGrantView): number {
+  if (!g.quota_bytes) return 0
+  const used = Math.min(g.used_bytes ?? 0, g.quota_bytes)
+  return Math.min(100, Math.round((used / g.quota_bytes) * 100))
+}
+function grantSourceLabel(s: string): string {
+  return s === 'traffic_package' ? 'Package' : 'Redemption'
+}
 const usedPct = computed(() => {
   if (quotaUnlimited.value) return 0
   if (quota.value === 0) return 100
@@ -129,7 +163,7 @@ const onlineCount = computed(() => nodes.value.filter((n) => n.online).length)
 const activeProduct = computed(() => {
   const p = profile.value
   if (!p?.current_product_name) return '—'
-  return `${p.current_product_name}${p.current_product_kind ? ` (${p.current_product_kind})` : ''}`
+  return p.current_product_name
 })
 const expireText = computed(() => {
   const e = profile.value?.expire_at
@@ -147,6 +181,9 @@ const showRenew = computed(() => {
 function onRenew() {
   router.push('/plans')
 }
+function onBuyTraffic() {
+  router.push({ name: 'traffic-packages' })
+}
 
 // Absolute base for the share URL / subscription link (mirrors SubscriptionView).
 const apiBase = computed(() => {
@@ -157,7 +194,6 @@ const apiBase = computed(() => {
 const shareUrl = computed(() =>
   profile.value ? `${apiBase.value}/sub/${profile.value.sub_token}` : '',
 )
-const resetEnabled = computed(() => profile.value?.current_plan_reset_enabled ?? false)
 // 1 Mbps = 125000 bytes/sec; 0/absent means unlimited.
 const BPS_PER_MBPS = 125000
 const speedLimitText = computed(() => {
@@ -177,69 +213,11 @@ async function copySubscription() {
   }
 }
 
-const resetting = ref(false)
-let resetTimer: ReturnType<typeof setInterval> | null = null
-function stopResetPoll() {
-  if (resetTimer) {
-    clearInterval(resetTimer)
-    resetTimer = null
-  }
-}
-function pollUntilResetPaid(orderId: string) {
-  stopResetPoll()
-  resetTimer = setInterval(async () => {
-    try {
-      const { data } = await apiOrder.get(orderId)
-      if (data.status === 'paid') {
-        stopResetPoll()
-        ElMessage.success('Payment confirmed. Your traffic has been reset.')
-        await dashboard.refresh()
-        payVisible.value = false
-      } else if (data.status === 'closed') {
-        stopResetPoll()
-        ElMessage.info('Order closed. You may try again.')
-      }
-    } catch {
-      /* ignore transient errors during polling */
-    }
-  }, 3000)
-  setTimeout(stopResetPoll, 120000)
-}
-
 const payVisible = ref(false)
 const payUrl = ref('')
 const payMode = ref<'redirect' | 'qr'>('redirect')
 const payPlatform = ref('')
 const payAmount = ref<number | undefined>()
-
-async function onResetTraffic() {
-  const pid = profile.value?.current_product_id
-  if (!pid || !resetEnabled.value) return
-  resetting.value = true
-  try {
-    const { data } = await apiOrder.create({ kind: OrderKindReset, plan_id: pid })
-    if (data.pay_url) {
-      payUrl.value = data.pay_url
-      payMode.value = data.pay_mode === 'qr' ? 'qr' : 'redirect'
-      payPlatform.value = data.order?.platform ?? ''
-      payAmount.value = data.order?.amount
-      if (payMode.value === 'qr') {
-        payVisible.value = true
-      } else {
-        window.open(data.pay_url, '_blank')
-      }
-      ElMessage.success('Order created — complete payment to reset traffic.')
-      await dashboard.refresh()
-      pollUntilResetPaid(data.order.id)
-    } else {
-      ElMessage.warning('No payment URL returned.')
-    }
-  } catch {
-    /* error toasted by interceptor */
-  } finally {
-    resetting.value = false
-  }
-}
 
 onMounted(async () => {
   // Dashboard data is loaded by the shell (and de-duped if already in flight).
@@ -254,7 +232,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div v-loading="loading">
+  <div v-loading="loading" class="dashboard-root">
     <h2 style="margin: 0 0 16px">Dashboard</h2>
 
     <el-alert
@@ -287,9 +265,6 @@ onMounted(async () => {
           <div class="stat-label">Current plan</div>
           <div class="stat-value">
             {{ profile?.current_product_name || '—' }}
-            <el-tag v-if="profile?.current_product_kind" size="small" type="info" class="kind-tag">
-              {{ profile.current_product_kind }}
-            </el-tag>
           </div>
           <div class="stat-sub">
             Expires: {{ expireText }}
@@ -306,22 +281,19 @@ onMounted(async () => {
         <el-card shadow="never" class="stat">
           <div class="stat-label">Remaining</div>
           <div class="stat-value">{{ quotaUnlimited ? '∞' : formatBytes(remaining) }}</div>
-          <div class="stat-sub">{{ quotaUnlimited ? 'Unlimited plan' : quota === 0 ? 'No quota' : usedPct + '% used' }}</div>
-          <div v-if="resetEnabled" class="stat-action">
-            <el-popconfirm
-                title="Reset traffic now? This creates a paid order."
-                width="260"
-                confirm-button-text="Reset"
-                cancel-button-text="Cancel"
-                confirm-button-type="warning"
-                @confirm="onResetTraffic"
-            >
-              <template #reference>
-                <el-button size="small" type="warning" :loading="resetting">
-                  Reset traffic
-                </el-button>
+          <div class="stat-sub">
+            <template v-if="quotaUnlimited">Unlimited plan</template>
+            <template v-else-if="quota === 0">No quota</template>
+            <template v-else>
+              {{ usedPct }}% used
+              <template v-if="trafficGrants.length">
+                · Base {{ baseRemaining === -1 ? '∞' : formatBytes(baseRemaining) }}
+                · Package {{ formatBytes(packageRemaining) }}
               </template>
-            </el-popconfirm>
+            </template>
+          </div>
+          <div class="stat-action">
+            <el-button type="primary" size="small" @click="onBuyTraffic">Buy traffic</el-button>
           </div>
         </el-card>
       </el-col>
@@ -364,15 +336,12 @@ onMounted(async () => {
             </el-descriptions-item>
             <el-descriptions-item label="Plan">
               {{ profile?.current_product_name || '-' }}
-              <el-tag v-if="profile?.current_product_kind" type="primary" size="small">
-                {{ profile?.current_product_kind }}
-              </el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="Level">{{ profile?.level ?? '—' }}</el-descriptions-item>
             <el-descriptions-item label="Speed limit">{{ speedLimitText }}</el-descriptions-item>
+            <el-descriptions-item label="Wallet Balance">{{ formatPrice(profile?.balance_cents ?? 0) }}</el-descriptions-item>
             <el-descriptions-item label="Expires">{{ expireText }}</el-descriptions-item>
             <el-descriptions-item label="Created">{{ formatDateTime(profile?.created_at) }}</el-descriptions-item>
-            <el-descriptions-item label="Wallet Balance">{{ formatPrice(profile?.balance_cents ?? 0) }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>
@@ -409,15 +378,51 @@ onMounted(async () => {
       </el-col>
     </el-row>
 
-    <el-card shadow="never" class="block">
-      <TrafficBarChart :data="hourly" />
-    </el-card>
+    <el-row :gutter="16" class="stat-row" style="flex: 1">
+      <el-col :xs="24" :md="12">
+        <el-card shadow="never" class="block info-card">
+          <template #header>Traffic packages</template>
+          <el-table v-if="trafficGrants.length" :data="trafficGrants" size="small" style="width: 100%">
+            <el-table-column label="Name" min-width="140">
+              <template #default="{ row }">{{ row.name || grantSourceLabel(row.source) }}</template>
+            </el-table-column>
+            <el-table-column label="Source" width="100">
+              <template #default="{ row }">{{ grantSourceLabel(row.source) }}</template>
+            </el-table-column>
+            <el-table-column label="Remaining / Usage" min-width="220">
+              <template #default="{ row }">
+                <div class="grant-usage">
+                  <span class="grant-remain">{{ formatBytes(grantRemaining(row as TrafficGrantView)) }} / {{ formatBytes(row.quota_bytes) }}</span>
+                  <el-progress :percentage="grantPct(row as TrafficGrantView)" :show-text="false" class="grant-bar" />
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="Order time" min-width="160">
+              <template #default="{ row }">{{ row.granted_at ? formatDateTime(row.granted_at) : '—' }}</template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else description="No traffic packages" :image-size="60" />
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :md="12">
+        <el-card shadow="never" class="block info-card">
+          <TrafficBarChart :data="hourly" />
+        </el-card>
+      </el-col>
+    </el-row>
 
     <PaymentDialog v-model="payVisible" :pay-url="payUrl" :pay-mode="payMode" :platform="payPlatform" :amount="payAmount" />
   </div>
 </template>
 
 <style scoped>
+.dashboard-root {
+  display: flex;
+  flex-direction: column;
+  /* Fill the main content area (100vh minus the 24px top/bottom padding). The
+     final chart/packages row uses flex:1 to grow into the leftover space. */
+  min-height: 80vh;
+}
 .stat-row :deep(.el-col) {
   display: flex;
 }
@@ -498,5 +503,19 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+.grant-usage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.grant-remain {
+  font-size: 13px;
+  color: #303133;
+  white-space: nowrap;
+}
+.grant-bar {
+  flex: 1;
+  min-width: 80px;
 }
 </style>

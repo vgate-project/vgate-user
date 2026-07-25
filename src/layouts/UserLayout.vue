@@ -54,6 +54,7 @@ const menus = [
   { name: 'dashboard', label: 'Dashboard', icon: 'Odometer' },
   { name: 'subscription', label: 'Subscription', icon: 'Connection' },
   { name: 'plans', label: 'Plans', icon: 'GoodsFilled' },
+  { name: 'traffic-packages', label: 'Traffic Packages', icon: 'Box' },
   { name: 'orders', label: 'Orders', icon: 'Tickets' },
   { name: 'traffic', label: 'Traffic', icon: 'DataLine' },
   { name: 'invites', label: 'Invites', icon: 'Promotion' },

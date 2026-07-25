@@ -38,6 +38,13 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true },
       },
       {
+        // Dedicated Traffic Packages view (separate from Plans).
+        path: 'traffic-packages',
+        name: 'traffic-packages',
+        component: () => import('@/views/TrafficPackagesView.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'orders',
         name: 'orders',
         component: () => import('@/views/OrdersView.vue'),

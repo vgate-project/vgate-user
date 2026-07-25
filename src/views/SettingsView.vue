@@ -298,7 +298,22 @@ onUnmounted(stopPolling)
           <el-descriptions-item label="Level">{{ profile?.level ?? '—' }}</el-descriptions-item>
           <el-descriptions-item label="Expires At">{{ formatDateTime(profile?.expire_at) }}</el-descriptions-item>
           <el-descriptions-item label="Quota">
-            {{ profile ? (profile.quota_bytes === -1 ? 'Unlimited' : profile.quota_bytes === 0 ? 'No quota' : formatBytes(profile.quota_bytes)) : '—' }}
+            <template v-if="profile">
+              <template v-if="profile.quota_bytes === -1">
+                Unlimited
+                <span v-if="profile.traffic_quota_bytes" class="quota-bonus">(+{{ formatBytes(profile.traffic_quota_bytes) }} bonus)</span>
+              </template>
+              <template v-else-if="profile.quota_bytes === 0 && !profile.traffic_quota_bytes">
+                No quota
+              </template>
+              <template v-else>
+                {{ formatBytes(profile.quota_bytes + (profile.traffic_quota_bytes ?? 0)) }}
+                <span v-if="profile.traffic_quota_bytes" class="quota-bonus">({{ formatBytes(profile.quota_bytes) }} base + {{ formatBytes(profile.traffic_quota_bytes) }} bonus)</span>
+              </template>
+            </template>
+            <template v-else>
+              —
+            </template>
           </el-descriptions-item>
           <el-descriptions-item label="Status">
             <el-tag :type="profile?.enabled ? 'success' : 'danger'" size="small">
