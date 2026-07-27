@@ -4,12 +4,14 @@ User-facing portal for **VGate**, built with Vue 3 + Vite + TypeScript. Customer
 it to log in, subscribe to a node, browse plans, place and pay orders, and monitor
 their traffic. It talks to the manager's REST API under `/api/v1`.
 
-When paying, the portal renders a **QR code** for WeChat Pay (NATIVE) and opens a redirect
-link for Alipay and Stripe Checkout, driven by the order's `pay_mode`.
+When paying, the order's `pay_mode` drives the UX: a **QR code** is shown whenever `pay_mode === 'qr'`
+(with a provider-aware hint covering both Alipay and WeChat Pay), an **`iap`** (Apple in-app) mode
+sends the user to complete the purchase in the iOS app, and otherwise the portal opens a redirect
+link (e.g. Alipay / Stripe / PayPal Checkout).
 
-The dashboard shows the user's effective speed cap (sourced from the active plan or a
-manual override), and the orders page displays the payment platform (Alipay / manual)
-for each order.
+The dashboard shows the user's effective speed cap (sourced from the active plan or a manual
+override), and the orders page displays the payment platform (`alipay` / `wechat` / `stripe` /
+`paypal` / `apple` / `manual`, …) for each order.
 
 ## Tech stack
 
@@ -20,7 +22,10 @@ for each order.
 - [Pinia](https://pinia.vuejs.org/) — state management
 - [Vue Router](https://router.vuejs.org/) — routing
 - [Axios](https://axios-http.com/) — HTTP client
-- [qrcode](https://github.com/soldair/node-qrcode) — subscription QR codes
+- [qrcode](https://github.com/soldair/node-qrcode) — subscription and payment QR codes
+- [@element-plus/icons-vue](https://element-plus.org/) — icon set
+- [@fortawesome/fontawesome-free](https://fontawesome.com/) — icon font
+- [dompurify](https://github.com/mptrinc/dompurify) — sanitizes HTML in plan/package descriptions
 
 ## Prerequisites
 
@@ -86,10 +91,11 @@ unlike the admin console). The login form also supports a Cloudflare Turnstile f
 
 Registration auto-logs-in: `POST /user/register` returns a session on both `201`
 (active) and `202` (pending email verification), so a new user lands straight on the
-dashboard's verify banner. **Email verification gates purchases and proxy traffic, not
-login** — an unverified user can browse but cannot place orders or consume traffic until
-`email_verified` is true. The `/verify-email` page (also reachable while already logged
-in) completes verification and clears the banner.
+dashboard's verify banner. The **Register** option appears inside the `/login` page only when
+the manager enables self-service registration (`user.register_enabled`). **Email verification
+gates purchases and proxy traffic, not login** — an unverified user can browse but cannot place
+orders or consume traffic until `email_verified` is true. The `/verify-email` page (also reachable
+while already logged in) completes verification and clears the banner.
 
 ## Routes / pages
 
@@ -100,6 +106,7 @@ in) completes verification and clears the banner.
   - `/plans` — browse and pick a plan
   - `/orders` — order history and pending orders
   - `/traffic` — traffic usage
+  - `/traffic-packages` — buy one-off traffic add-on packages (requires an active plan)
   - `/invites` — invite codes / referral
   - `/redeem` — redeem an invite or redemption code
   - `/announcements` — system announcements
