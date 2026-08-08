@@ -7,7 +7,9 @@ their traffic. It talks to the manager's REST API under `/api/v1`.
 When paying, the order's `pay_mode` drives the UX: a **QR code** is shown whenever `pay_mode === 'qr'`
 (with a provider-aware hint covering both Alipay and WeChat Pay), an **`iap`** (Apple in-app) mode
 sends the user to complete the purchase in the iOS app, and otherwise the portal opens a redirect
-link (e.g. Alipay / Stripe / PayPal Checkout).
+link (e.g. Alipay / Stripe / PayPal Checkout). Note the `iap` handling applies to the plans,
+traffic-packages, and change-plan flows — the **Orders** page's "Pay" action only distinguishes
+`qr` from everything else, so an `iap` order there opens its `pay_url` in a new tab instead.
 
 The dashboard shows the user's effective speed cap (sourced from the active plan or a manual
 override), and the orders page displays the payment platform (`alipay` / `wechat` / `stripe` /
@@ -108,7 +110,7 @@ while already logged in) completes verification and clears the banner.
   - `/traffic` — traffic usage
   - `/traffic-packages` — buy one-off traffic add-on packages (requires an active plan)
   - `/invites` — invite codes / referral
-  - `/redeem` — redeem an invite or redemption code
+  - `/redeem` — redeem a redemption code (issued by the admin console)
   - `/announcements` — system announcements
   - `/tickets` — support tickets (open, reply, close; choose Telegram/email notifications)
   - `/settings` — account settings / change password, and link a Telegram account
